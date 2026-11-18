@@ -13,7 +13,7 @@
 
 ## 0. Filosofía y Principios Rectores
 
-Market Sano no es un clon. Es una **alternativa local-first, open-source y MCP-first** que resuelve los problemas que tanto TapCook como Piatto ignoran deliberadamente: la **precisión de los precios reales** en el retail chileno y la **soberanía del usuario** sobre sus datos y su proveedor de IA.
+Market Sano no es un clon. Es una **alternativa local-first, open-source y MCP-first** que resuelve los problemas que las apps comerciales de planificación ignoran deliberadamente: la **precisión de los precios reales** en el retail chileno y la **soberanía del usuario** sobre sus datos y su proveedor de IA.
 
 1.  **Local-first y Docker-first:** Un único `docker compose up` debe levantar el sistema completo. No hay dependencia de servicios en la nube para el funcionamiento básico.
 2.  **MCP como interfaz de primera clase:** La misma lógica de negocio que consume la interfaz web se expone como herramientas (Tools), Recursos (Resources) y Prompts MCP. Cualquier agente (Claude Desktop, Cursor, un bot propio) puede operar el sistema.
@@ -24,63 +24,34 @@ Market Sano no es un clon. Es una **alternativa local-first, open-source y MCP-f
 
 ---
 
-## 1. Análisis Comparativo: TapCook vs. Piatto vs. Market Sano
+## 1. Análisis de Mercado y Diferenciación
 
-Esta sección es fundamental para entender las decisiones de producto. Market Sano **no elige entre TapCook o Piatto**, sino que sintetiza sus mejores ideas y corrige sus fallas estructurales.
+Esta sección resume los problemas detectados en las soluciones existentes de planificación de comidas y las decisiones de producto que definen a Market Sano.
 
-### 1.1. TapCook: El Pionero del Presupuesto Estricto
+### 1.1. Problemas de las soluciones existentes
 
-**Propuesta de valor:** "Tu presupuesto manda". La app invierte el flujo tradicional: empieza por el dinero, no por la receta. Le dices cuánto quieres gastar, y ella arma la semana y la lista de compras para no pasarse.
+- **Precios estimados, no reales:** parten de referencias nacionales ajustadas por cadena, de modo que el total en caja **siempre** difiere del mostrado. Para Chile, esto es inaceptable.
+- **Paywall agresivo:** la funcionalidad completa queda tras una suscripción, a menudo justo después de elegir el supermercado.
+- **Producto cerrado y de pago:** sin soberanía del usuario sobre sus datos ni posibilidad de operar la propia instancia.
+- **Recetas monótonas:** los planes tienden a repetir cenas dentro de pocas semanas.
+- **Sin interfaz para agentes:** no existe forma de automatizar el flujo (planificar → estimar → comprar → registrar) más allá de la app oficial.
+- **Sin integración con el hogar:** ninguna conexión con Home Assistant ni con la red local del usuario.
 
-**Fortalezas Clave (a replicar):**
+### 1.2. Decisiones de producto de Market Sano
 
-- **Presupuesto como eje central:** El plan semanal se genera en torno a un `budget_clp` definido por el usuario. Si una cena no cabe, se reemplaza automáticamente.
-- **"Despensa inteligente":** Los ingredientes que el usuario marca como disponibles en casa se descuentan del costo y de la lista de compras.
-- **Lista de compras única y agrupada por pasillo:** Optimiza el recorrido en la tienda.
-- **Importación de recetas desde redes:** Una función que permite transformar videos de TikTok/Instagram en recetas estructuradas.
-
-**Debilidades Críticas (a corregir):**
-
-- **Precios estimados, no reales:** Admite que sus precios parten de una referencia nacional y se ajustan por cadena. El total en caja **siempre** difiere. Para Chile, esto es inaceptable.
-- **Sin plan gratuito:** Paywall agresivo justo después de elegir el supermercado.
-- **Recetas repetitivas:** Varias reseñas mencionan que las cenas se sienten monótonas.
-- **Navegación pobre:** Dificultad para volver a los menús una vez creado el plan.
-
-### 1.2. Piatto (mypiatto.app): El Maestro de la Experiencia y la Decisión
-
-**Propuesta de valor:** "Never plan dinner again". Se enfoca en eliminar la "fatiga de decisión" de la cena, ofreciendo un plan semanal en segundos, altamente personalizado y con una UX impecable.
-
-**Fortalezas Clave (a replicar):**
-
-- **Onboarding sin fricción:** No requiere cuenta (no email, no password). El usuario responde unas pocas preguntas (supermercado, presupuesto, comensales, alergias) y obtiene un plan al instante.
-- **Experiencia de usuario superior:**
-    - **Modo Cocina (Cook Mode):** Pasos grandes y claros, temporizadores integrados y pantalla que no se apaga.
-    - **Intercambio inteligente de comidas:** Al cambiar una cena, el resto de la semana se **reequilibra automáticamente** para mantenerse dentro del presupuesto.
-    - **Lista de compras por pasillo:** Ordenada según el layout específico del supermercado elegido (más de 85 cadenas).
-    - **Planificación de sobras:** "Cocina una vez, come dos veces" para reducir el desperdicio.
-    - **Aprendizaje de gustos:** El sistema aprende qué cenas le gustan al usuario para futuros planes.
-- **Enfoque en la cena:** Reconoce que la cena es la comida que genera más estrés de decisión y se especializa en ella.
-- **Base de datos global:** 201 cadenas en 32 países, con planes que incluyen "comidas que la gente realmente cocina donde vives".
-
-**Debilidades Críticas (a corregir):**
-
-- **Precios estimados, no reales:** Al igual que TapCook, admite que sus precios son "estimaciones realistas", no totales en vivo.
-- **Modelo de suscripción:** Aunque ofrece 3 días de prueba, es un producto cerrado y de pago.
-- **Enfoque limitado:** Se centra casi exclusivamente en la cena, dejando de lado el almuerzo, desayuno o la gestión de una despensa completa.
-
-### 1.3. Matriz de Decisión: Qué Tomar y Qué Dejar
-
-| Característica | TapCook | Piatto | **Market Sano (Decisión)** |
-| :--- | :--- | :--- | :--- |
-| **Enfoque principal** | Presupuesto semanal estricto | Eliminar la fatiga de decisión (cena) | **Presupuesto estricto + UX superior para todas las comidas** |
-| **Precios** | Estimados (referencia nacional) | Estimados "realistas" | **Precios reales vía conectores locales (Jumbo, Santa Isabel, Unimarc, …)** |
-| **Modelo de negocio** | Suscripción (paywall) | Suscripción (prueba de 3 días) | **100% Gratuito y Open-Source (GPL-3.0-or-later)** |
-| **Onboarding** | Requiere cuenta y suscripción | Sin cuenta, rápido | **Sin cuenta (modo local `none`) o cuenta local opcional** |
-| **Experiencia de cocina** | Básica | **Modo Cocina avanzado (timers, pantalla siempre activa)** | **Modo Cocina avanzado + integración con Home Assistant** |
-| **Intercambio de comidas** | Sí, pero recalcula lista | **Sí, reequilibra la semana automáticamente** | **Sí, reequilibrio automático y opción de "dividir la compra"** |
-| **Despensa** | Sí ("kitchen counts") | No | **Sí, con movimientos y alertas de vencimiento** |
-| **Integración con agentes** | Ninguna | Ninguna | **MCP nativo (Tools, Resources, Prompts)** |
-| **Integración con HA** | Ninguna | Ninguna | **Sí (REST, MQTT Discovery, Custom Component)** |
+| Característica | **Decisión** |
+| :--- | :--- |
+| **Enfoque principal** | **Presupuesto estricto + UX superior para todas las comidas** |
+| **Precios** | **Precios reales vía conectores locales (Jumbo, Santa Isabel, Unimarc, …)** |
+| **Modelo de negocio** | **100% Gratuito y Open-Source (GPL-3.0-or-later)** |
+| **Onboarding** | **Sin cuenta (modo local `none`) o cuenta local opcional** |
+| **Experiencia de cocina** | **Modo Cocina avanzado (timers, pantalla siempre activa) + integración con Home Assistant** |
+| **Intercambio de comidas** | **Reequilibrio automático y opción de "dividir la compra"** |
+| **Despensa** | **Sí, con movimientos y alertas de vencimiento** |
+| **Integración con agentes** | **MCP nativo (Tools, Resources, Prompts)** |
+| **Integración con HA** | **Sí (REST, MQTT Discovery, Custom Component)** |
+| **Variedad** | **Sin repetir recetas en 4 semanas (configurable) + aprendizaje de gustos por calificación** |
+| **Sobras** | **"Cocina una vez, come dos veces": planificación de sobras y "noche libre"** |
 
 ---
 
@@ -127,10 +98,10 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 1. El agente llama a `get_household_context()` → obtiene `household_id`, `weekly_budget_clp`, `default_store_id`, `dietary_restrictions`.
 2. El agente llama a `search_recipes(query="", max_cost_per_serving=3500, tags=["sin_gluten"])` → obtiene una lista de recetas candidatas.
-3. El agente llama a `create_meal_plan(week_start="2026-11-23", budget_clp=45000, constraints={...})` → el sistema crea un plan en estado `draft` (borrador). El algoritmo de generación se inspira en Piatto: selecciona cenas variadas (sin repetir en 4 semanas) y reequilibra automáticamente si el usuario luego intercambia una comida.
+3. El agente llama a `create_meal_plan(week_start="2026-11-23", budget_clp=45000, constraints={...})` → el sistema crea un plan en estado `draft` (borrador). El algoritmo de generación selecciona cenas variadas (sin repetir en 4 semanas) y reequilibra automáticamente si el usuario luego intercambia una comida.
 4. El agente llama a `estimate_meal_plan_cost(plan_id="...", store_ids=["jumbo", "santaisabel"])` → el sistema consulta el conector de supermercados y devuelve el costo total por cadena.
 5. El agente presenta el plan al humano. El humano debe confirmar explícitamente en la interfaz web (o mediante una acción separada con token de confirmación). El agente no puede llamar a `confirm_meal_plan` sin aprobación humana.
-6. Una vez confirmado, el agente llama a `generate_shopping_list(plan_id="...")` → el sistema descuenta el inventario disponible y genera la lista, agrupada por pasillo (inspirado en Piatto).
+6. Una vez confirmado, el agente llama a `generate_shopping_list(plan_id="...")` → el sistema descuenta el inventario disponible y genera la lista, agrupada por pasillo.
 7. El agente llama a `compare_basket_across_stores(list_id="...")` → devuelve el total por cadena y los ítems donde conviene dividir la compra.
 8. Post-compra, el humano o un agente autorizado llama a `record_actual_purchase(list_id="...", store_id="...", total_clp=...)` para cerrar el ciclo presupuestario.
 
@@ -142,15 +113,15 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 ### 3.1. Módulo de Hogar y Autenticación
 
-**Propósito:** Soportar uno o varios hogares por instancia, con roles y preferencias compartidas, siguiendo el modelo de Piatto de cero fricción en el onboarding.
+**Propósito:** Soportar uno o varios hogares por instancia, con roles y preferencias compartidas, con cero fricción en el onboarding.
 
 **Funciones**
 
-- **Modo Single-User (sin login):** Para instalaciones caseras. La app arranca con un hogar por defecto y no solicita credenciales. Se activa con `AUTH_MODE=none`. Esto replica la experiencia "No sign-up" de Piatto.
+- **Modo Single-User (sin login):** Para instalaciones caseras. La app arranca con un hogar por defecto y no solicita credenciales. Se activa con `AUTH_MODE=none`.
 - **Modo Multi-Usuario (opcional):** Registro local (email + contraseña hasheada con Argon2) o login con proveedor OIDC (Authelia, Keycloak) para instalaciones familiares o de grupos.
 - **Gestión de Hogares:** CRUD de hogares (households). Cada hogar tiene nombre, moneda (CLP por defecto), zona horaria y presupuesto semanal por defecto.
 - **Miembros y Roles:** Un usuario puede pertenecer a varios hogares. Roles: `owner`, `member`, `viewer`.
-- **Preferencias del Hogar:** Restricciones dietéticas (JSON array), alergias (filtros duros, como en Piatto), ingredientes que nunca se compran, supermercado habitual, comuna (para filtros de disponibilidad).
+- **Preferencias del Hogar:** Restricciones dietéticas (JSON array), alergias (filtros duros), ingredientes que nunca se compran, supermercado habitual, comuna (para filtros de disponibilidad).
 - **Invitaciones:** Generación de un código alfanumérico de un solo uso, válido por 24 horas, para unirse a un hogar.
 
 **Entidades y Campos**
@@ -172,7 +143,7 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 ### 3.2. Módulo de Recetas
 
-**Propósito:** El núcleo de datos. Debe permitir crear, importar, escalar y buscar recetas con ingredientes estructurados, incorporando la variedad y el aprendizaje de gustos de Piatto.
+**Propósito:** El núcleo de datos. Debe permitir crear, importar, escalar y buscar recetas con ingredientes estructurados, incorporando variedad garantizada y aprendizaje de gustos.
 
 **Funciones**
 
@@ -183,7 +154,7 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 - **Escalado Automático:** `scale_recipe(recipe_id, target_servings)` ajusta las cantidades. Regla de redondeo: para unidades no divisibles (huevos), redondear hacia arriba; para peso/volumen, mantener un decimal.
 - **Cálculo de Costo por Porción:** `get_recipe_cost(recipe_id, store_id)` consulta el último `price_snapshot` de cada ingrediente y divide por las porciones base.
 - **Sistema de Calificación y Aprendizaje:** El usuario califica una receta (1–5). El sistema usa estas calificaciones para priorizar recetas similares en futuras generaciones de planes.
-- **Variedad Garantizada:** El generador de planes evita repetir la misma receta en un período configurable (por defecto, 4 semanas, como Piatto).
+- **Variedad Garantizada:** El generador de planes evita repetir la misma receta en un período configurable (por defecto, 4 semanas).
 - **Importación:**
   - **Desde URL:** Scraping de JSON-LD (`recipe-scrapers`).
   - **Desde Texto Pegado:** El usuario pega una receta en texto libre. El sistema crea un `recipe_import_job` y, si hay IA configurada, la usa para estructurarla.
@@ -198,7 +169,7 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 | `recipe_ingredients` | id, recipe_id (FK), product_id (FK), quantity, unit, optional, notes, sort_order | |
 | `recipe_steps` | id, recipe_id (FK), step_number, instruction, duration_minutes | |
 | `recipe_tags` | recipe_id (FK), tag | PK compuesta |
-| `recipe_ratings` | id, recipe_id, user_id, rating (1-5), rated_at | Inspirado en Piatto |
+| `recipe_ratings` | id, recipe_id, user_id, rating (1-5), rated_at | Base del aprendizaje de gustos |
 | `recipe_collections` | id, household_id, name | |
 | `recipe_collection_items` | collection_id, recipe_id | |
 | `recipe_import_jobs` | id, household_id, source_type, source_value, status, result_json, error_message, created_at, completed_at | |
@@ -245,15 +216,15 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 ### 3.4. Módulo de Planificación de Comidas y Presupuesto
 
-**Propósito:** El flujo estrella. Planificar por presupuesto y comparar el costo real antes de comprar, con la flexibilidad y el reequilibrio automático de Piatto.
+**Propósito:** El flujo estrella. Planificar por presupuesto y comparar el costo real antes de comprar, con reequilibrio automático de la semana.
 
 **Funciones**
 
 - **Planificador Semanal:** `meal_plans` con `week_start`, `budget_clp`, `status` (`draft`, `confirmed`, `archived`).
 - **Entradas del Plan (`meal_plan_entries`):** date, meal_slot (desayuno, almuerzo, cena, snack), recipe_id, servings_multiplier.
-- **Modo Presupuesto Estricto (TapCook):** Al crear un plan, el sistema sugiere recetas cuyo costo total no supere el `budget_clp`.
-- **Reequilibrio Automático (Piatto):** Si el usuario intercambia una cena (`swap_meal`), el sistema recalcula automáticamente el resto de la semana para mantenerse dentro del presupuesto. La UI debe mostrar el "ahorro" o "exceso" de cada swap.
-- **Modo "Noche Libre":** El planificador puede reservar una noche para sobras o comida para llevar, contabilizándola en el presupuesto (inspirado en Piatto).
+- **Modo Presupuesto Estricto:** Al crear un plan, el sistema sugiere recetas cuyo costo total no supere el `budget_clp`.
+- **Reequilibrio Automático:** Si el usuario intercambia una cena (`swap_meal`), el sistema recalcula automáticamente el resto de la semana para mantenerse dentro del presupuesto. La UI debe mostrar el "ahorro" o "exceso" de cada swap.
+- **Modo "Noche Libre":** El planificador puede reservar una noche para sobras o comida para llevar, contabilizándola en el presupuesto.
 - **Estimación de Costo en Tiempo Real:** `estimate_meal_plan_cost(plan_id, store_ids[])` agrega los ingredientes, consulta el conector de supermercados y devuelve el total por cadena.
 - **Historial y Snapshots:** Cada estimación se guarda en `budget_snapshots`.
 
@@ -278,13 +249,13 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 ### 3.5. Módulo de Listas de Compras y Comparación de Precios (Chile)
 
-**Propósito:** Convertir el plan confirmado en una lista accionable, con precios reales y comparación entre cadenas, priorizando la organización por pasillo de Piatto.
+**Propósito:** Convertir el plan confirmado en una lista accionable, con precios reales y comparación entre cadenas, priorizando la organización por pasillo.
 
 **Funciones**
 
 - **Generación desde Plan:** Agrega ingredientes, descuenta inventario y redondea a unidades de compra (packs = `ceil(aggregated_canonical_quantity / purchase_size)`).
 - **Lista Manual:** El usuario puede agregar ítems sueltos.
-- **Categorización por Pasillo:** Cada ítem se agrupa por `category` para ordenar el recorrido. La UI debe permitir reordenar los pasillos según el layout del supermercado del usuario (inspirado en Piatto).
+- **Categorización por Pasillo:** Cada ítem se agrupa por `category` para ordenar el recorrido. La UI debe permitir reordenar los pasillos según el layout del supermercado del usuario.
 - **Comparación de Precios entre Cadenas:** `compare_basket_across_stores(list_id)` devuelve el precio en cada cadena, el total del carro por cadena, los ítems donde una cadena es más barata y una sugerencia de "dividir la compra" si el ahorro supera un umbral.
 - **Precio por Unidad de Medida (PPUM):** Obligatorio por normativa chilena. Cada `price_snapshot` almacena `unit_price_clp`.
 - **Trazabilidad del Precio:** Cada snapshot tiene `source` (`live`, `cached`, `manual`), `fetched_at` y `confidence` (`high`, `medium`, `low`). La UI debe mostrar la fecha y una advertencia si `confidence` es `low`.
@@ -413,9 +384,9 @@ Todas las tools de escritura deben aceptar `dry_run: bool = True`. Si es True, d
 
 - **Dashboard del Hogar:** Presupuesto de la semana (barra de progreso), plan actual, lista pendiente, gasto real acumulado.
 - **Recetario:** Búsqueda con filtros, tarjetas con costo estimado y calificación promedio, detalle de receta con ingredientes escalables y pasos.
-- **Planificador Semanal:** Vista de calendario con arrastrar y soltar, costo total visible, indicador de "dentro del presupuesto" / "excedido", botón de "reequilibrar" (inspirado en Piatto).
+- **Planificador Semanal:** Vista de calendario con arrastrar y soltar, costo total visible, indicador de "dentro del presupuesto" / "excedido", botón de "reequilibrar".
 - **Lista de Compras:** Ítems agrupados por pasillo, checkboxes, tabla de comparación por cadena, botón de exportación.
-- **Modo Cocina:** Pantalla completa con pasos grandes, temporizadores integrados y pantalla que no se apaga (inspirado en Piatto).
+- **Modo Cocina:** Pantalla completa con pasos grandes, temporizadores integrados y pantalla que no se apaga.
 - **Inventario:** Lista de ítems con cantidad, ubicación y vencimiento, alertas visuales.
 - **Configuración:** Preferencias del hogar, configuración de IA, supermercados, miembros e invitaciones.
 
@@ -649,7 +620,7 @@ Vigente desde el 1 de diciembre de 2026. La aplicación debe facilitar el cumpli
 - **Finalidad Limitada:** Los datos recopilados solo se usan para el funcionamiento de la app. No hay marketing ni cesión a terceros.
 - **Minimización:** No se solicita RUT, dirección exacta ni datos sensibles. La comuna es suficiente.
 - **Derecho de Supresión:** El usuario debe poder eliminar su cuenta y todos sus datos asociados desde la UI (`delete_household` con cascada).
-- **Sin Tracking:** A diferencia de TapCook y Piatto, la app no incluye SDKs de analytics ni rastreadores publicitarios.
+- **Sin Tracking:** La app no incluye SDKs de analytics ni rastreadores publicitarios.
 
 ### 7.2. Seguridad de Secretos
 
@@ -683,7 +654,7 @@ Desde septiembre de 2025, el SERNAC exige informar el PPUM. Cada `price_snapshot
 - [ ] Importación de recetas desde URL (JSON-LD / recipe-scrapers).
 - [ ] Inventario con movimientos y descuento en listas.
 - [ ] Planificador semanal con presupuesto y cálculo de costo (precios manuales o un único conector, ej. Jumbo).
-- [ ] Reequilibrio automático al intercambiar comidas (inspirado en Piatto).
+- [ ] Reequilibrio automático al intercambiar comidas.
 - [ ] Lista de compras con categorización por pasillo y exportación CSV.
 - [ ] Registro de gasto real simple (total por compra).
 - [ ] Interfaz web mínima para todas las operaciones.
@@ -731,7 +702,7 @@ Desde septiembre de 2025, el SERNAC exige informar el PPUM. Cada `price_snapshot
 
 - **App móvil nativa:** No es necesaria para el MVP. La web responsive + MCP cubre el caso de uso.
 - **OCR de recibos:** Útil pero añade dependencias pesadas. Es v2.
-- **Importación desde video:** Es el "wow factor" de TapCook, pero requiere transcripción + IA. Es v2.
+- **Importación desde video:** Requiere transcripción + IA. Es v2.
 - **Multi-moneda:** Chile usa CLP. No complicar el modelo hasta que haya demanda de otros países.
 - **Gamificación / notificaciones push:** No aportan al núcleo de presupuesto y precios reales.
 

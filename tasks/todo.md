@@ -198,7 +198,7 @@
 **Archivos:** `backend/app/services/planner.py`, `backend/app/mcp/tools_plans.py`, `backend/tests/test_planner.py`
 
 ### Task 18: Intercambio de comidas + reequilibrio automático
-**Descripción:** `swap_meal(plan_id, entry_id, new_recipe_id)`: reemplaza y reequilibra el resto de la semana para volver al presupuesto, devolviendo ahorro/exceso por swap; la UI mostrará estos valores en T26. Este es el "killer feature" de Piatto a replicar.
+**Descripción:** `swap_meal(plan_id, entry_id, new_recipe_id)`: reemplaza y reequilibra el resto de la semana para volver al presupuesto, devolviendo ahorro/exceso por swap; la UI mostrará estos valores en T26.
 **Criterios de aceptación:**
 - [ ] Swap que excede presupuesto dispara reequilibrio documentado (qué cambió y por qué)
 - [ ] Retorno incluye costo del nuevo entry, costo nuevo del plan y delta vs presupuesto

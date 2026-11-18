@@ -64,5 +64,3 @@ Lee [CONTRIBUTING.md](CONTRIBUTING.md) — el proyecto se rige por el [CODE_OF_C
 ## 📄 Licencia
 
 **GPL-3.0-or-later** — ver [LICENSE](LICENSE). La spec v2.0 propuso originalmente AGPL-3.0; el mantenedor decidió GPL-3.0-or-later (decisión registrada en `docs/spec.md` §9.1).
-
-Créditos: la comparativa de producto (TapCook, Piatto) está documentada en la spec. Los precios reales son posibles gracias a [`mcp-supermercados-cl`](https://github.com/NLACE-COM/mcp-supermercados-cl) (MIT), que se ejecuta 100% en tu máquina.
