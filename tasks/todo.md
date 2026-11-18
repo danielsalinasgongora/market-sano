@@ -55,7 +55,7 @@
 - [x] `fastmcp dev backend/app/mcp_server.py` (o inspector MCP) ejecuta las 3 tools contra la semilla — verificado con el cliente MCP de FastMCP (in-memory) **y** un roundtrip stdio real (`StdioTransport` + `python -m app.mcp_server` como subproceso, igual que Claude Desktop) en `tests/test_mcp.py`
 - [x] `docs/mcp-tools.md` documenta contrato de cada tool (params/retorno/permisos/errores accionables + roadmap del contrato)
 - [x] `docs/clients/claude-desktop.md` con JSON de configuración stdio reproducible (Windows/macOS/Cursor + solución de problemas)
-**Verificación:** Manual: conectar Claude Desktop y ejecutar `get_household_context` → devuelve hogar sembrado. ✔ Automático verificado 2026-11-17 (28/28 tests: list_tools, call_tool, read_resource y stdio end-to-end). Conexión manual con Claude Desktop: pendiente del usuario como parte del Checkpoint A.
+**Verificación:** Manual: conectar Claude Desktop y ejecutar `get_household_context` → devuelve hogar sembrado. ✔ Automático verificado 2026-11-17 (28/28 tests: list_tools, call_tool, read_resource y stdio end-to-end). Conexión manual con Claude Desktop ✔ 2026-11-18.
 **Dependencias:** T4. **Tamaño:** M
 **Archivos:** `backend/app/mcp_server.py`, `backend/app/mcp/tools_read.py`, `docs/mcp-tools.md`, `docs/clients/claude-desktop.md`
 
@@ -69,9 +69,9 @@
 **Archivos:** `.github/workflows/ci.yml`, `README.md`
 
 ### ✅ Checkpoint A — Criterio de salida Fase 0 (spec)
-- [ ] Cualquiera puede: `git clone` → `docker compose --profile minimal up` → conectar Claude Desktop vía stdio y ejecutar las 3 tools — automatizado verificado por tests (compose + semilla + stdio roundtrip); **pendiente tu prueba manual con Claude Desktop** siguiendo `docs/clients/claude-desktop.md`
+- [x] Cualquiera puede: `git clone` → `docker compose --profile minimal up` → conectar Claude Desktop vía stdio y ejecutar las 3 tools — automatizado verificado por tests (compose + semilla + stdio roundtrip); manual con Claude Desktop ✔ 2026-11-18 (vía `docker exec`)
 - [x] CI verde; `/health` OK; migraciones aplicadas (contenedor en `0001 (head)`, CI runs #1-#5 en verde)
-- [ ] **Revisión humana antes de Fase 1** — pendiente: conecta Claude Desktop y confirma que `get_household_context` devuelve tu hogar
+- [x] **Revisión humana antes de Fase 1** — ✔ 2026-11-18: Claude Desktop conectado y `get_household_context` OK
 
 ---
 
