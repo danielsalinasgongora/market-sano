@@ -80,10 +80,10 @@
 ### Task 7: PriceService con trazabilidad (manual + caché) + PPUM
 **Descripción:** Contrato estable de precios: `get_latest_price(product_id, store_id)` con prioridad live→cache→manual, metadatos `source`/`confidence`/`fetched_at` y stale-flag; API para precio manual; `unit_price_clp` (PPUM) obligatorio; TTL configurable (`PRICE_CACHE_TTL_HOURS`).
 **Criterios de aceptación:**
-- [ ] `POST /api/v1/prices` crea snapshot `source=manual, confidence=high` con `unit_price_clp` validado
-- [ ] `GET /api/v1/products/{id}/price?store_id=jumbo` devuelve snapshot más reciente + metadatos + indicador de antigüedad
-- [ ] Tests con reloj simulado (fake clock) cubren prioridad de fuentes y TTL
-**Verificación:** `pytest backend/tests -k prices`; curl de precio manual creado y leído.
+- [x] `POST /api/v1/prices` crea snapshot `source=manual, confidence=high` con `unit_price_clp` validado
+- [x] `GET /api/v1/products/{id}/price?store_id=jumbo` devuelve snapshot más reciente + metadatos + indicador de antigüedad
+- [x] Tests con reloj simulado (fake clock) cubren prioridad de fuentes y TTL
+**Verificación:** `pytest backend/tests -k prices`; curl de precio manual creado y leído. ✔ Verificado 2026-11-17: 8 tests nuevos (36/36 totales: POST/GET, 404/422, prioridad por frescura, TTL live→cached, manual no caduca); curl real contra el contenedor `:8000` (palta en jumbo $1.590, PPUM $1.590). `registrar_snapshot` genérico queda listo para el conector (T9). Semántica documentada: gana el snapshot más reciente; live expirado se reporta `source_efectiva=cached` + `is_stale`.
 **Dependencias:** T3, T4. **Tamaño:** M
 **Archivos:** `backend/app/services/prices.py`, `backend/app/api/prices.py`, `backend/tests/test_prices.py`
 
