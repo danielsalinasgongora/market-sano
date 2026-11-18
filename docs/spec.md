@@ -7,7 +7,7 @@
 **Licencia:** GPL-3.0-or-later
 **Estado:** Documento de diseño y análisis comparativo, adoptado como base del desarrollo.
 
-> **Nota de adopción (2026-11-17):** esta spec fue redactada como *Rinde La Olla* bajo AGPL-3.0. Al adoptarse para el repo público [`danielsalinasgongora/market-sano`](https://github.com/danielsalinasgongora/market-sano) se decidió: producto **Market Sano**, licencia **GPL-3.0-or-later**, multi-usuario local desde v0.1 y precios reales desde la Fase 1. Los identificadores técnicos y topics MQTT usan `marketsano`. Las decisiones de §9 resueltas quedan anotadas con ✔. El plan de ejecución activo vive en `tasks/plan.md` y `tasks/todo.md`.
+> **Nota de adopción (2026-11-17):** esta spec fue redactada como *Rinde La Olla* bajo AGPL-3.0. Al adoptarse para el repo público [`danielsalinasgongora/market-sano`](https://github.com/danielsalinasgongora/market-sano) se decidió: producto **Market Sano**, licencia **GPL-3.0-or-later**, multi-usuario local desde v0.1 y precios reales desde la Fase 1. Los identificadores técnicos y topics MQTT usan `marketsano`. Las decisiones de §9 resueltas quedan anotadas con ✔. El plan de ejecución activo vive en `tasks/plan.md` y `tasks/todo.md`. Requerimientos del mantenedor (2026-11-17): catálogo abierto —búsqueda de artículos en cadena y alta como ingredientes (tabla `product_store_matches`; tools `search_store_products`/`add_product_from_store`)— y subida de recetas propias con instrucciones de preparación.
 
 ---
 
@@ -150,6 +150,7 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 - **CRUD de Recetas:** Título, descripción, porciones base (`base_servings`), tiempo de preparación (`prep_minutes`), tiempo de cocción (`cook_minutes`), dificultad, instrucciones (Markdown).
 - **Ingredientes Estructurados:** Cada ingrediente apunta a un `product_id` del catálogo normalizado. Campos: cantidad, unidad, opcional, notas.
 - **Pasos Ordenados:** Lista ordenada de pasos (`recipe_steps`).
+- **Recetas propias:** el usuario sube sus recetas manualmente con instrucciones de preparación (texto y pasos ordenados con duración), además de importarlas desde URL o texto pegado.
 - **Etiquetas y Colecciones:** `recipe_tags` y `recipe_collections`.
 - **Escalado Automático:** `scale_recipe(recipe_id, target_servings)` ajusta las cantidades. Regla de redondeo: para unidades no divisibles (huevos), redondear hacia arriba; para peso/volumen, mantener un decimal.
 - **Cálculo de Costo por Porción:** `get_recipe_cost(recipe_id, store_id)` consulta el último `price_snapshot` de cada ingrediente y divide por las porciones base.
@@ -255,6 +256,7 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 
 - **Generación desde Plan:** Agrega ingredientes, descuenta inventario y redondea a unidades de compra (packs = `ceil(aggregated_canonical_quantity / purchase_size)`).
 - **Lista Manual:** El usuario puede agregar ítems sueltos.
+- **Catálogo abierto:** búsqueda de artículos directamente en las cadenas (vía conector) y alta de los resultados como productos del catálogo para usarlos como ingredientes, guardando el match por cadena (URL/SKU) en `product_store_matches` para que el refresco de precios los mantenga actualizados (tools `search_store_products` y `add_product_from_store`).
 - **Categorización por Pasillo:** Cada ítem se agrupa por `category` para ordenar el recorrido. La UI debe permitir reordenar los pasillos según el layout del supermercado del usuario.
 - **Comparación de Precios entre Cadenas:** `compare_basket_across_stores(list_id)` devuelve el precio en cada cadena, el total del carro por cadena, los ítems donde una cadena es más barata y una sugerencia de "dividir la compra" si el ahorro supera un umbral.
 - **Precio por Unidad de Medida (PPUM):** Obligatorio por normativa chilena. Cada `price_snapshot` almacena `unit_price_clp`.
@@ -279,6 +281,8 @@ El siguiente flujo debe poder ejecutarse llamando exclusivamente a herramientas 
 | `compare_basket_across_stores` | list_id | [{store_id, store_name, total_clp, item_comparison}] | No |
 | `update_shopping_list_item` | item_id, checked, actual_price_clp | {updated_item} | Sí |
 | `record_actual_purchase` | list_id, store_id, total_clp, receipt_data | {expense_id} | Sí (requiere token) |
+| `search_store_products` | query, store_id, limit | [{name, brand, price_clp, unit_price_clp, url}] | No |
+| `add_product_from_store` | resultado_búsqueda, dry_run | {product_id, match_id} o {preview} | Sí |
 
 ### 3.6. Módulo de Gastos y Finanzas del Hogar
 
@@ -580,6 +584,7 @@ Ejemplo de payload:
 | `shopping_list_items` | Ítems de lista | id, list_id, product_id, required_quantity, checked |
 | `price_snapshots` | Precios históricos | id, product_id, store_id, price_clp, unit_price_clp, source, confidence, fetched_at |
 | `store_connectors` | Configuración de conectores | id, name, type, enabled, config |
+| `product_store_matches` | Catálogo abierto: match de producto por cadena | product_id, store_id, store_url, sku, matched_at |
 | `expenses` | Gastos reales | id, household_id, store_id, amount_clp, date |
 | `expense_items` | Desglose de gasto | id, expense_id, product_id, quantity, unit_price_clp |
 | `expense_categories` | Categorías | id, name |
@@ -590,6 +595,7 @@ Ejemplo de payload:
 - `meal_plan_entries(plan_id, date)`
 - `pantry_items(household_id, product_id)`
 - `shopping_list_items(list_id, checked)`
+- `product_store_matches(product_id, store_id)`
 
 ---
 

@@ -27,6 +27,7 @@ El plan entrega en **v0.1** el vertical mínimo completo: *recetas → plan sema
 | D5 | **Autenticación v0.1** (spec §9.1) | **Multi-usuario local desde v0.1**: registro email + Argon2id, roles owner/member/viewer, invitaciones de un solo uso (24 h). `AUTH_MODE=none` se mantiene como modo sin fricción (hogar por defecto). OIDC se difiere a Fase 5. |
 | D6 | **GitHub** | Repo público: https://github.com/danielsalinasgongora/market-sano (creado por el usuario, URL entregada 2026-11-17). El agente configura `origin` y hace el push inicial. |
 | D7 | **Nombre del producto** | **Market Sano** (sobrescribe el nombre de la spec v2.0 §9.1, que usaba "Rinde La Olla"). Identificadores técnicos y topics MQTT: `marketsano`. La carpeta local de Drive conserva su nombre; no afecta al repo. |
+| D8 | **Catálogo abierto y recetas propias** (2026-11-17) | (1) Los usuarios suben recetas propias con instrucciones de preparación (T10/T12/T31 + web T25). (2) Pueden **buscar artículos en el supermercado** vía conector y darlos de alta como productos/ingredientes: nueva **Task 9b** (tools `search_store_products` + `add_product_from_store`; tabla `product_store_matches`, migración 0002). (3) Esos artículos entran al ciclo de refresco de precios del conector (T9/T9b). Sin menciones a productos de terceros en la documentación pública. |
 
 ### Decidido por la spec (adoptado tal cual)
 
@@ -56,7 +57,7 @@ La spec pone precios reales en su Fase 2 (sem. 12–23). Por la decisión D3, **
 | Nuestra fase | Contenido | Equivalente spec §8 |
 |---|---|---|
 | Fase 0 — Esqueleto público | Repo GPL-3.0, Docker minimal, esquema completo, semilla, MCP lectura, CI | Fase 0 (sem. 1–3) |
-| Fase 1 — Precios temprano | Contrato de precios con trazabilidad + spike + integración conector | (adelanto de Fase 2) |
+| Fase 1 — Precios temprano | Contrato de precios con trazabilidad + spike + integración conector + **catálogo abierto (T9b, decisión D8)** | (adelanto de Fase 2) |
 | Fase 2 — Núcleo vía API/MCP | Autenticación/hogares §3.1 + recetas → plan → despensa → lista → gasto, con tools MCP de escritura | Fase 1 (sem. 4–11) + MCP de Fase 2 |
 | Fase 3 — Web PWA | Las 7 vistas del MVP (incl. login/registro) + PWA + HA Nivel 1 | Fase 1 (interfaz web) |
 | Fase 4 — v1 completo | IA opcional, MQTT Nivel 2, Mealie/Tandoor, multi-arch, release | Fase 2 (sem. 12–23) |

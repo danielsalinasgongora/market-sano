@@ -98,7 +98,7 @@
 **Archivos:** `docs/connectors/spike-2026-11.md`, `docs/connectors/` (evidencias)
 
 ### Task 9: Integración del conector (cliente MCP stdio) + refresco TTL + degradación elegante
-**Descripción:** `connectors/supermercados_cl.py`: lanza el conector como subproceso local y habla MCP; refresca `price_snapshots` (`source=live, confidence=high`) con TTL; ante fallo devuelve caché con `confidence` degradado y advertencia; perfiles compose `standard`/`full` con el conector; documentar alternativa host-mode para el puente de navegador futuro.
+**Descripción:** `connectors/supermercados_cl.py`: lanza el conector como subproceso local y habla MCP; refresca `price_snapshots` (`source=live, confidence=high`) con TTL; ante fallo devuelve caché con `confidence` degradado y advertencia; perfiles compose `standard`/`full` con el conector; documentar alternativa host-mode para el puente de navegador futuro. El refresco cubre también los productos dados de alta desde búsqueda de supermercado (T9b), usando su match por cadena.
 **Criterios de aceptación:**
 - [ ] Con conector activo: precio de producto del catálogo refrescado a `source=live` en Jumbo
 - [ ] Con conector caído: respuesta degradada correcta (caché + `confidence` baja + warning) — sin excepciones al usuario
@@ -108,9 +108,21 @@
 **Dependencias:** T8. **Tamaño:** M
 **Archivos:** `backend/app/connectors/supermercados_cl.py`, `docker-compose.yml`, `backend/tests/test_connector.py`, `docs/connectors/README.md`
 
+### Task 9b: Catálogo abierto — búsqueda en supermercado y alta de productos (decisión D8)
+**Descripción:** Los usuarios pueden buscar artículos directamente en las cadenas (passthrough del conector: `search_store_products(query, store_id)`, MCP + API) y darlos de alta en su catálogo como ingredientes (`add_product_from_store`, con `dry_run` por defecto): crea/actualiza `product_catalog` con la unidad canónica inferida del resultado y guarda el match por cadena (URL/SKU) en la nueva tabla `product_store_matches` (migración 0002), para que el refresco de precios (T9) los mantenga actualizados.
+**Criterios de aceptación:**
+- [ ] `search_store_products` (MCP + API) devuelve resultados enriquecidos del conector (nombre, marca, precio, PPUM, URL) sin escribir nada
+- [ ] `add_product_from_store` crea el producto con unidad canónica inferida y el match por cadena; `dry_run=true` devuelve preview sin escribir
+- [ ] Los productos con match quedan dentro del ciclo de refresco TTL de T9 (prueba con conector stub)
+- [ ] Migración 0002 con `product_store_matches(product_id, store_id, store_url, sku, matched_at)` e índice `(product_id, store_id)`
+**Verificación:** `pytest backend/tests -k catalogo_abierto`; manual: buscar un artículo en jumbo desde el inspector MCP y agregarlo al catálogo.
+**Dependencias:** T9. **Tamaño:** M
+**Archivos:** `backend/app/api/products.py`, `backend/app/mcp/tools_catalog.py`, `backend/app/models/catalog.py`, `backend/migrations/versions/0002_*.py`
+
 ### ✅ Checkpoint B — Precios reales operativos
 - [ ] Costo de una receta semilla calculado con precio **live de Jumbo** y con precio manual; ambos con metadatos correctos
 - [ ] Degradación live→cache→manual verificada end-to-end
+- [ ] Búsqueda en cadena viva (`search_store_products`) y alta de producto al catálogo (`add_product_from_store`) verificadas (T9b)
 - [ ] **Revisión humana antes de Fase 2**
 
 ---
@@ -118,7 +130,7 @@
 ## Fase 2 — Núcleo completo vía API/MCP (auth §3.1 + flujo canónico §2.2)
 
 ### Task 10: CRUD de recetas + create_recipe (dry_run) + rate_recipe
-**Descripción:** API y MCP para crear/editar recetas con ingredientes estructurados (→`product_id`), pasos ordenados, tags; `create_recipe` con `dry_run=true` por defecto (preview sin escribir); calificación 1–5 para el futuro aprendizaje de gustos.
+**Descripción:** Subida de recetas propias del usuario: API y MCP para crear/editar recetas con ingredientes estructurados (→`product_id`), **instrucciones de preparación** (texto Markdown y pasos ordenados con duración), tags; `create_recipe` con `dry_run=true` por defecto (preview sin escribir); calificación 1–5 para el futuro aprendizaje de gustos.
 **Criterios de aceptación:**
 - [ ] Alta vía API con ingredientes, pasos y tags; validación: todo ingrediente resuelve al catálogo
 - [ ] `create_recipe` MCP con `dry_run=true` devuelve preview sin tocar BD; con `false` crea y devuelve `recipe_id`
