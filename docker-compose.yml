@@ -5,6 +5,8 @@
 # `--profile standard` añade PostgreSQL 16.
 # `--profile full` añade MQTT (Home Assistant) y el conector de supermercados.
 
+name: market-sano
+
 services:
   app:
     build:

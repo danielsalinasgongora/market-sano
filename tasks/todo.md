@@ -22,10 +22,10 @@
 ### Task 2: Backend FastAPI + Docker perfil minimal + healthcheck
 **Descripción:** Esqueleto FastAPI con settings por entorno, SQLite (WAL), Alembic baseline, `/health`, Dockerfile multi-arch-ready y compose perfil `minimal` con healthcheck. `pyproject.toml` con `fastmcp<3`.
 **Criterios de aceptación:**
-- [ ] `docker compose --profile minimal up` levanta la app en `:8000`
-- [ ] `GET /health` → `{"status":"ok","db":"connected"}`; `alembic upgrade head` corre al arrancar
-- [ ] `pytest backend/tests` y `ruff check backend` limpios desde el primer commit
-**Verificación:** `docker compose --profile minimal up` + `curl localhost:8000/health`.
+- [x] `docker compose --profile minimal up` levanta la app en `:8000`
+- [x] `GET /health` → `{"status":"ok","db":"connected"}`; `alembic upgrade head` corre al arrancar
+- [x] `pytest backend/tests` y `ruff check backend` limpios desde el primer commit
+**Verificación:** `docker compose --profile minimal up` + `curl localhost:8000/health`. ✔ Verificado 2026-11-17 (7 tests + ruff limpios; contenedor `Up (healthy)`; proyecto compose renombrado a `market-sano`; `.dockerignore` reduce el contexto de build de 194 MB a 2 kB).
 **Dependencias:** T1. **Tamaño:** M
 **Archivos:** `backend/app/main.py`, `backend/app/settings.py`, `backend/migrations/`, `docker/Dockerfile`, `docker-compose.yml`
 
