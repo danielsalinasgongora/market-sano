@@ -12,7 +12,7 @@ Decisiones:
   conector mcp-supermercados-cl; el registry vive en `store_connectors`.
 """
 
-from app.models.catalog import PriceSnapshot, ProductCatalog, StoreConnector
+from app.models.catalog import PriceSnapshot, ProductCatalog, ProductStoreMatch, StoreConnector
 from app.models.common import utcnow
 from app.models.enums import (
     Difficulty,
@@ -81,6 +81,7 @@ __all__ = [
     "PriceSnapshot",
     "PriceSource",
     "ProductCatalog",
+    "ProductStoreMatch",
     "Recipe",
     "RecipeCollection",
     "RecipeCollectionItem",

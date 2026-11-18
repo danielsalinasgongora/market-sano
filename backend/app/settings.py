@@ -36,6 +36,10 @@ class Settings(BaseSettings):
 
     # ── Conector de supermercados (opcional, 100% local) ──────
     supermercados_enabled: bool = False
+    # Comando que lanza el conector MCP por stdio (JSON en la variable de entorno).
+    # La imagen Docker lo trae instalado en /opt (ver docker/Dockerfile).
+    supermercados_command: list[str] = ["npx", "-y", "mcp-supermercados-cl@1.4.9"]
+    supermercados_timeout_s: float = 30.0
 
     # ── Capa de precios ───────────────────────────────────────
     price_cache_ttl_hours: int = 12

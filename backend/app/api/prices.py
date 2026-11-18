@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
+from app.connectors.supermercados_cl import refrescar_precio
 from app.db import get_session
 from app.models import ProductCatalog
-from app.services.prices import PrecioResuelto, get_latest_price, registrar_precio_manual
+from app.services.prices import get_latest_price, registrar_precio_manual
 
 router = APIRouter(tags=["precios"])
 
@@ -50,7 +51,7 @@ def crear_precio_manual(
 
 
 @router.get("/api/v1/products/{product_id}/price")
-def obtener_precio(
+def obtener_precio(  # sync a propósito: corre en threadpool y puede usar asyncio.run
     product_id: int,
     store_id: str,
     request: Request,
@@ -58,16 +59,23 @@ def obtener_precio(
 ) -> dict[str, Any]:
     """Último precio del producto en la cadena, con metadatos de trazabilidad.
 
+    Con el conector habilitado y match para la cadena, refresca en vivo si no
+    hay un precio live dentro del TTL; si el conector falla, devuelve el último
+    precio conocido con `confidence_efectiva=low` y `warning`.
     Si el producto no tiene precios registrados, `price` viene `null`
     (estado legítimo: aún no se ha consultado ninguna cadena).
     """
     if session.get(ProductCatalog, product_id) is None:
         raise HTTPException(status_code=404, detail=f"No existe el producto {product_id}.")
 
-    ttl: int = request.app.state.settings.price_cache_ttl_hours
-    resuelto: PrecioResuelto | None = get_latest_price(
-        session, product_id=product_id, store_id=store_id, ttl_hours=ttl
+    resuelto, advertencia = refrescar_precio(
+        session, request.app.state.settings, product_id=product_id, store_id=store_id
     )
-    if resuelto is None:
-        return {"product_id": product_id, "store_id": store_id, "price": None}
-    return {"product_id": product_id, "store_id": store_id, "price": resuelto.a_dict()}
+    respuesta: dict[str, Any] = {
+        "product_id": product_id,
+        "store_id": store_id,
+        "price": resuelto.a_dict() if resuelto else None,
+    }
+    if advertencia:
+        respuesta["warning"] = advertencia
+    return respuesta

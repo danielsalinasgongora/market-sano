@@ -32,6 +32,8 @@ class PrecioResuelto:
     is_stale: bool
     age_hours: float
     source_efectiva: PriceSource
+    # None = la del snapshot; el conector la baja a `low` si no pudo refrescar.
+    confidence_efectiva: PriceConfidence | None = None
 
     def a_dict(self) -> dict[str, object]:
         return {
@@ -43,6 +45,7 @@ class PrecioResuelto:
             "source": self.snapshot.source.value,
             "source_efectiva": self.source_efectiva.value,
             "confidence": self.snapshot.confidence.value,
+            "confidence_efectiva": (self.confidence_efectiva or self.snapshot.confidence).value,
             "fetched_at": self.snapshot.fetched_at.isoformat(),
             "is_stale": self.is_stale,
             "age_hours": round(self.age_hours, 2),

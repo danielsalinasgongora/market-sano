@@ -27,6 +27,7 @@ from app.models import (
     PantryItem,
     PantryMovement,
     ProductCatalog,
+    ProductStoreMatch,
     Recipe,
     RecipeIngredient,
     RecipeStep,
@@ -34,6 +35,7 @@ from app.models import (
     StoreConnector,
 )
 from app.models.enums import Difficulty, MovementReason, PantryLocation
+from app.seed_data.matches import MATCHES_JUMBO, PESO_UNIDAD_G
 from app.seed_data.products import PRODUCTOS
 from app.seed_data.recipes import RECETAS
 from app.settings import get_settings
@@ -120,6 +122,27 @@ def _seed_productos(session: Session) -> dict[str, ProductCatalog]:
         por_nombre[nombre] = producto
     session.flush()
     return por_nombre
+
+
+def _seed_matches(session: Session, por_nombre: dict[str, ProductCatalog]) -> int:
+    """Matches curados y pesos por unidad: solo rellena lo que falta, nunca
+    pisa un match o peso que el usuario haya cambiado (T9b)."""
+    for nombre, peso in PESO_UNIDAD_G.items():
+        if por_nombre[nombre].unit_weight_g is None:
+            por_nombre[nombre].unit_weight_g = peso
+    for nombre, url, sku in MATCHES_JUMBO:
+        producto = por_nombre[nombre]
+        existente = session.exec(
+            select(ProductStoreMatch).where(
+                ProductStoreMatch.product_id == producto.id,
+                ProductStoreMatch.store_id == "jumbo",
+            )
+        ).first()
+        if existente is None:
+            session.add(
+                ProductStoreMatch(product_id=producto.id, store_id="jumbo", store_url=url, sku=sku)
+            )
+    return len(MATCHES_JUMBO)
 
 
 def _seed_recetas(session: Session, por_nombre: dict[str, ProductCatalog]) -> int:
@@ -236,6 +259,7 @@ def seed(session: Session) -> dict[str, Any]:
     recetas = _seed_recetas(session, por_nombre)
     categorias = _seed_categorias(session)
     conectores = _seed_conectores(session)
+    matches = _seed_matches(session, por_nombre)
     despensa = _seed_despensa(session, hogar, por_nombre)
     session.commit()
 
@@ -245,6 +269,7 @@ def seed(session: Session) -> dict[str, Any]:
         "recetas": recetas,
         "categorias_gasto": categorias,
         "conectores": conectores,
+        "matches_cadena": matches,
         "despensa_demo": despensa,
     }
 

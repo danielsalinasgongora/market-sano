@@ -100,11 +100,11 @@
 ### Task 9: Integración del conector (cliente MCP stdio) + refresco TTL + degradación elegante
 **Descripción:** `connectors/supermercados_cl.py`: lanza el conector como subproceso local y habla MCP; refresca `price_snapshots` (`source=live, confidence=high`) con TTL; ante fallo devuelve caché con `confidence` degradado y advertencia; perfiles compose `standard`/`full` con el conector; documentar alternativa host-mode para el puente de navegador futuro. El refresco cubre también los productos dados de alta desde búsqueda de supermercado (T9b), usando su match por cadena.
 **Criterios de aceptación:**
-- [ ] Con conector activo: precio de producto del catálogo refrescado a `source=live` en Jumbo
-- [ ] Con conector caído: respuesta degradada correcta (caché + `confidence` baja + warning) — sin excepciones al usuario
-- [ ] Tests con conector stub (subproceso MCP falso) cubren éxito, fallo y TTL
-- [ ] `docs/connectors/README.md` explica perfiles y requisitos (Node.js, IP residencial)
-**Verificación:** `pytest backend/tests -k connector`; manual: bajar el conector y verificar degradación.
+- [x] Con conector activo: precio de producto del catálogo refrescado a `source=live` en Jumbo
+- [x] Con conector caído: respuesta degradada correcta (caché + `confidence` baja + warning) — sin excepciones al usuario
+- [x] Tests con conector stub (subproceso MCP falso) cubren éxito, fallo y TTL
+- [x] `docs/connectors/README.md` explica perfiles y requisitos (Node.js, IP residencial)
+**Verificación:** `pytest backend/tests -k connector`; manual: bajar el conector y verificar degradación. ✔ Verificado 2026-11-18: 10 tests nuevos con conector falso por stdio real (éxito Jumbo/Unimarc por SKU, caído, comando inexistente, manual no se degrada, TTL fresco/vencido, sin match/deshabilitado, semilla idempotente); e2e con el conector real vía la API: tomate/leche/arroz/palta/pollo → `live` desde Jumbo (tomate $1.045, PPUM $314/un con peso medio 150 g); conector caído → `confidence_efectiva=low` + `warning`. Incluye fixes del spike: migración 0002 (`product_store_matches` adelantada desde T9b + `product_catalog.unit_weight_g`), convención de unidad del PPUM y 20 matches curados de Jumbo en la semilla. Dockerfile con Node 22 + conector en `/opt` (**build pendiente: Docker no estaba corriendo**). Disparo: on-demand en `GET …/price`; sin refresco masivo programado.
 **Dependencias:** T8. **Tamaño:** M
 **Archivos:** `backend/app/connectors/supermercados_cl.py`, `docker-compose.yml`, `backend/tests/test_connector.py`, `docs/connectors/README.md`
 
@@ -114,7 +114,7 @@
 - [ ] `search_store_products` (MCP + API) devuelve resultados enriquecidos del conector (nombre, marca, precio, PPUM, URL) sin escribir nada
 - [ ] `add_product_from_store` crea el producto con unidad canónica inferida y el match por cadena; `dry_run=true` devuelve preview sin escribir
 - [ ] Los productos con match quedan dentro del ciclo de refresco TTL de T9 (prueba con conector stub)
-- [ ] Migración 0002 con `product_store_matches(product_id, store_id, store_url, sku, matched_at)` e índice `(product_id, store_id)`
+- [x] Migración 0002 con `product_store_matches(product_id, store_id, store_url, sku, matched_at)` e índice `(product_id, store_id)` — hecha en T9 (unique `(product_id, store_id)`)
 **Verificación:** `pytest backend/tests -k catalogo_abierto`; manual: buscar un artículo en jumbo desde el inspector MCP y agregarlo al catálogo.
 **Dependencias:** T9. **Tamaño:** M
 **Archivos:** `backend/app/api/products.py`, `backend/app/mcp/tools_catalog.py`, `backend/app/models/catalog.py`, `backend/migrations/versions/0002_*.py`

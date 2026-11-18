@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.models.common import json_column, utcnow
@@ -15,6 +15,8 @@ class ProductCatalog(SQLModel, table=True):
 
     `default_unit` es la unidad canónica (g, ml, unidad). `purchase_size`
     es el tamaño del pack de compra en unidad canónica (Anexo A).
+    `unit_weight_g` (opcional): peso medio de una unidad, para productos que
+    el catálogo cuenta por unidad pero las cadenas venden a granel por kg.
     """
 
     __tablename__ = "product_catalog"
@@ -26,6 +28,29 @@ class ProductCatalog(SQLModel, table=True):
     purchase_unit: str | None = Field(default=None, max_length=64)
     purchase_size: float | None = Field(default=None)
     aliases: list[str] = Field(default_factory=list, sa_column=json_column())
+    unit_weight_g: float | None = Field(default=None)
+
+
+class ProductStoreMatch(SQLModel, table=True):
+    """Producto del catálogo ↔ producto concreto de una cadena (spike T8).
+
+    El refresco live (T9) consulta `store_url` (o busca por `sku` donde la
+    cadena no permite consultar por URL). Un match por (producto, cadena).
+    """
+
+    __tablename__ = "product_store_matches"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_id", "store_id", name="uq_product_store_matches_product_store"
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    product_id: int = Field(foreign_key="product_catalog.id", ondelete="CASCADE")
+    store_id: str = Field(max_length=64)
+    store_url: str = Field(max_length=500)
+    sku: str | None = Field(default=None, max_length=64)
+    matched_at: datetime = Field(default_factory=utcnow)
 
 
 class StoreConnector(SQLModel, table=True):
@@ -43,7 +68,9 @@ class StoreConnector(SQLModel, table=True):
 class PriceSnapshot(SQLModel, table=True):
     """Precio de un producto en una cadena, con trazabilidad completa.
 
-    `unit_price_clp` es el PPUM, obligatorio por normativa SERNAC (spec §7.3).
+    `unit_price_clp` es el PPUM, obligatorio por normativa SERNAC (spec §7.3),
+    expresado según el `default_unit` del producto: g → CLP/kg, ml → CLP/L,
+    unidad → CLP/unidad.
     Índice crítico de la spec §5: (product_id, store_id, fetched_at).
     Nota: el índice es ascendente plano; el rango de consulta típico
     (`WHERE product_id=? AND store_id=? ORDER BY fetched_at DESC LIMIT 1`)

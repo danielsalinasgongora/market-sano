@@ -3,7 +3,8 @@
 #
 # `docker compose up` levanta el perfil mínimo (app + SQLite).
 # `--profile standard` añade PostgreSQL 16.
-# `--profile full` añade MQTT (Home Assistant) y el conector de supermercados.
+# `--profile full` añade MQTT (Home Assistant).
+# Precios en vivo: SUPERMERCADOS_ENABLED=true en cualquier perfil (docs/connectors/README.md).
 
 name: market-sano
 
@@ -17,6 +18,9 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/app.db
       AUTH_MODE: ${AUTH_MODE:-none}
+      # Precios en vivo (Jumbo/Santa Isabel/Unimarc). El conector viene en la imagen.
+      SUPERMERCADOS_ENABLED: ${SUPERMERCADOS_ENABLED:-false}
+      PRICE_CACHE_TTL_HOURS: ${PRICE_CACHE_TTL_HOURS:-12}
     volumes:
       - ./data:/data
     healthcheck:
@@ -40,12 +44,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Se completa en la Fase 1 (integración del conector mcp-supermercados-cl):
-  # connector:
-  #   image: node:20-slim
-  #   profiles: ["full"]
-  #   ...
 
   mqtt:
     image: eclipse-mosquitto:2
