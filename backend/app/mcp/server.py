@@ -12,6 +12,10 @@ INSTRUCCIONES = (
     "presupuesto en CLP. En esta Fase 0 dispones de tools de lectura: "
     "get_household_context (configuración del hogar), search_recipes "
     "(búsqueda por texto y etiquetas) y get_pantry_status (despensa). "
+    "Catálogo abierto: search_store_products busca en Jumbo/Santa Isabel/"
+    "Unimarc y add_product_from_store agrega el resultado al catálogo; esta "
+    "última escribe, así que llámala primero con dry_run=true, muestra la "
+    "vista previa y repite con dry_run=false solo si el usuario confirma. "
     "Los datos viven en la base local del usuario; si la base está vacía, "
     "sugiere ejecutar `python -m app.seed` para crear datos de ejemplo."
 )

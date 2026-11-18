@@ -24,8 +24,10 @@ PRODUCTOS = {
     },
 }
 UNIMARC = [
-    {"sku": "111", "name": "Arroz otra marca 1 Kg", "price": 1500, "unitPrice": 1500, "unit": "kg"},
-    {"sku": "9411", "name": "Arroz Merkat G2 1 Kg", "price": 890, "unitPrice": 890, "unit": "kg"},
+    {"sku": "111", "name": "Arroz otra marca 1 Kg", "price": 1500, "unitPrice": 1500,
+     "unit": "kg", "url": "https://www.unimarc.cl/product/arroz-otra-1kg"},
+    {"sku": "9411", "name": "Arroz Merkat G2 1 Kg", "price": 890, "unitPrice": 890,
+     "unit": "kg", "url": "https://www.unimarc.cl/product/arroz-merkat-g2-1kg"},
 ]
 
 

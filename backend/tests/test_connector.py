@@ -126,13 +126,34 @@ def test_manual_no_se_degrada_si_el_conector_falla(engine_sembrado: Engine) -> N
     assert data["price"]["confidence_efectiva"] == "high"
 
 
+def _match_antiguo(engine: Engine, product_id: int, horas: float) -> None:
+    """Retrocede la fecha del match (la semilla lo crea 'ahora')."""
+    with Session(engine) as session:
+        match = session.exec(
+            select(ProductStoreMatch).where(ProductStoreMatch.product_id == product_id)
+        ).one()
+        match.matched_at = datetime.now(UTC) - timedelta(hours=horas)
+        session.add(match)
+        session.commit()
+
+
 def test_live_dentro_del_ttl_no_consulta_el_conector(engine_sembrado: Engine) -> None:
     leche = _producto(engine_sembrado, "leche")
+    _match_antiguo(engine_sembrado, leche, horas=48)
     _snapshot(engine_sembrado, leche, PriceSource.live, horas=1)
     # Con el conector en modo error: si lo consultara, habría warning.
     data = _precio(_cliente(engine_sembrado, modo="error"), leche)
     assert "warning" not in data
     assert data["price"]["price_clp"] == 1100
+
+
+def test_match_reemplazado_invalida_el_live_anterior(engine_sembrado: Engine) -> None:
+    """Un live fresco del producto viejo no sirve si el match es más nuevo."""
+    leche = _producto(engine_sembrado, "leche")
+    _match_antiguo(engine_sembrado, leche, horas=-0.01)  # match recién (re)fijado
+    _snapshot(engine_sembrado, leche, PriceSource.live, horas=1)
+    precio = _precio(_cliente(engine_sembrado), leche)["price"]
+    assert precio["price_clp"] == 1000  # refrescado desde el conector, no 1100
 
 
 def test_live_vencido_se_refresca(engine_sembrado: Engine) -> None:

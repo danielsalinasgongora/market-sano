@@ -13,6 +13,7 @@ Ante cualquier fallo del conector se devuelve el último precio conocido con
 import asyncio
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 from fastmcp import Client
@@ -54,13 +55,42 @@ def _datos(resultado: Any) -> dict[str, Any]:
     return json.loads(resultado.content[0].text)
 
 
+def _cliente(settings: Settings) -> Client:
+    """shortcut: un subproceso por consulta (~1 s extra); pasar a un cliente
+    persistente si el refresco masivo lo hace lento."""
+    comando, *args = settings.supermercados_command
+    return Client(StdioTransport(comando, args), timeout=settings.supermercados_timeout_s)
+
+
+async def buscar_productos(
+    settings: Settings, store_id: str, query: str, limit: int = 10
+) -> list[dict[str, Any]]:
+    """Búsqueda passthrough en la cadena (T9b). Solo lectura; lanza ErrorConector."""
+    if not settings.supermercados_enabled:
+        raise ErrorConector(
+            "El conector de supermercados está deshabilitado (SUPERMERCADOS_ENABLED=false)."
+        )
+    try:
+        async with _cliente(settings) as c:
+            datos = _datos(
+                await c.call_tool(
+                    "search_products",
+                    {"store": store_id, "query": query, "limit": limit},
+                    raise_on_error=False,
+                )
+            )
+    except ErrorConector:
+        raise
+    except Exception as exc:  # subproceso caído, timeout: mensaje accionable
+        raise ErrorConector(f"No se pudo consultar {store_id}: {exc}") from exc
+    return datos.get("products", [])
+
+
 async def _consultar(
     settings: Settings, store_id: str, match: ProductStoreMatch, query: str
 ) -> dict[str, Any]:
-    """Una consulta al conector. shortcut: un subproceso por consulta (~1 s extra);
-    pasar a un cliente persistente si el refresco masivo lo hace lento."""
-    comando, *args = settings.supermercados_command
-    async with Client(StdioTransport(comando, args), timeout=settings.supermercados_timeout_s) as c:
+    """Precio actual del producto fijado por el match."""
+    async with _cliente(settings) as c:
         if store_id in CADENAS_CON_URL:
             return _datos(
                 await c.call_tool(
@@ -82,6 +112,10 @@ async def _consultar(
         raise ErrorConector(f"El producto fijado (sku {match.sku}) ya no aparece en {store_id}.")
 
 
+def _utc(momento: datetime) -> datetime:
+    return momento if momento.tzinfo else momento.replace(tzinfo=UTC)
+
+
 def _degradado(previo: PrecioResuelto | None) -> PrecioResuelto | None:
     # La palabra del usuario (manual) no se degrada; caché/live viejo sí.
     if previo is None or previo.snapshot.source == PriceSource.manual:
@@ -99,16 +133,19 @@ def refrescar_precio(
     """
     ttl = settings.price_cache_ttl_hours
     previo = get_latest_price(session, product_id=product_id, store_id=store_id, ttl_hours=ttl)
-    if previo is not None and previo.snapshot.source == PriceSource.live and not previo.is_stale:
-        return previo, None
-    if not settings.supermercados_enabled:
-        return previo, None
     match = session.exec(
         select(ProductStoreMatch).where(
             ProductStoreMatch.product_id == product_id, ProductStoreMatch.store_id == store_id
         )
     ).first()
-    if match is None:
+    fresco = (
+        previo is not None
+        and previo.snapshot.source == PriceSource.live
+        and not previo.is_stale
+        # un match reemplazado (T9b) invalida el live del producto anterior
+        and (match is None or _utc(previo.snapshot.fetched_at) >= _utc(match.matched_at))
+    )
+    if fresco or not settings.supermercados_enabled or match is None:
         return previo, None
 
     producto = session.get(ProductCatalog, product_id)

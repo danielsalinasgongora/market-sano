@@ -111,18 +111,18 @@
 ### Task 9b: Catálogo abierto — búsqueda en supermercado y alta de productos (decisión D8)
 **Descripción:** Los usuarios pueden buscar artículos directamente en las cadenas (passthrough del conector: `search_store_products(query, store_id)`, MCP + API) y darlos de alta en su catálogo como ingredientes (`add_product_from_store`, con `dry_run` por defecto): crea/actualiza `product_catalog` con la unidad canónica inferida del resultado y guarda el match por cadena (URL/SKU) en la nueva tabla `product_store_matches` (migración 0002), para que el refresco de precios (T9) los mantenga actualizados.
 **Criterios de aceptación:**
-- [ ] `search_store_products` (MCP + API) devuelve resultados enriquecidos del conector (nombre, marca, precio, PPUM, URL) sin escribir nada
-- [ ] `add_product_from_store` crea el producto con unidad canónica inferida y el match por cadena; `dry_run=true` devuelve preview sin escribir
-- [ ] Los productos con match quedan dentro del ciclo de refresco TTL de T9 (prueba con conector stub)
+- [x] `search_store_products` (MCP + API) devuelve resultados enriquecidos del conector (nombre, marca, precio, PPUM, URL) sin escribir nada
+- [x] `add_product_from_store` crea el producto con unidad canónica inferida y el match por cadena; `dry_run=true` devuelve preview sin escribir
+- [x] Los productos con match quedan dentro del ciclo de refresco TTL de T9 (prueba con conector stub)
 - [x] Migración 0002 con `product_store_matches(product_id, store_id, store_url, sku, matched_at)` e índice `(product_id, store_id)` — hecha en T9 (unique `(product_id, store_id)`)
-**Verificación:** `pytest backend/tests -k catalogo_abierto`; manual: buscar un artículo en jumbo desde el inspector MCP y agregarlo al catálogo.
+**Verificación:** `pytest backend/tests -k catalogo_abierto`; manual: buscar un artículo en jumbo desde el inspector MCP y agregarlo al catálogo. ✔ Verificado 2026-11-18: 8 tests nuevos (API + tools MCP in-memory con conector falso stdio: búsqueda sin escritura, 503 deshabilitado, dry_run, crear + precio live por SKU en Unimarc, vincular/reemplazar sin duplicar, unidad incompatible 422) + 1 test en T9 (match reemplazado invalida el live anterior). E2E con conector real vía API: "quinoa" buscada en Jumbo → alta (g, pack 250 g) → precio live $2.250 (PPUM $9.000/kg); "leche" vinculada en Santa Isabel → live $990. Manual con inspector MCP: pendiente del usuario. Endpoints: `GET /api/v1/stores/{store_id}/products`, `POST /api/v1/products/from-store?dry_run=`.
 **Dependencias:** T9. **Tamaño:** M
 **Archivos:** `backend/app/api/products.py`, `backend/app/mcp/tools_catalog.py`, `backend/app/models/catalog.py`, `backend/migrations/versions/0002_*.py`
 
 ### ✅ Checkpoint B — Precios reales operativos
-- [ ] Costo de una receta semilla calculado con precio **live de Jumbo** y con precio manual; ambos con metadatos correctos
-- [ ] Degradación live→cache→manual verificada end-to-end
-- [ ] Búsqueda en cadena viva (`search_store_products`) y alta de producto al catálogo (`add_product_from_store`) verificadas (T9b)
+- [x] Costo de una receta semilla calculado con precio **live de Jumbo** y con precio manual; ambos con metadatos correctos — 2026-11-18, Charquicán: 6 ingredientes live Jumbo + 4 manuales → $11.792 ($2.948/porción), cada línea con `source`/`confidence_efectiva` (cálculo en script e2e; el servicio `get_recipe_cost` llega en T11)
+- [x] Degradación live→cache→manual verificada end-to-end — conector caído real → último precio con `confidence_efectiva=low` + `warning`; manual no se degrada
+- [x] Búsqueda en cadena viva (`search_store_products`) y alta de producto al catálogo (`add_product_from_store`) verificadas (T9b) — vía API con conector real; vía MCP con conector falso
 - [ ] **Revisión humana antes de Fase 2**
 
 ---

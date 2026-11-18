@@ -76,6 +76,38 @@ Estado de la despensa (spec §3.3): cantidades por producto, ubicación e ítems
 
 **Retorno:** lista de `{product_id, product_name, quantity, unit, location, expires_at}` (ISO 8601 o null).
 
+## Tools del catálogo abierto (Task 9b)
+
+Requieren el conector de supermercados (`SUPERMERCADOS_ENABLED=true`, ver [docs/connectors](connectors/README.md)). Sin él, `search_store_products` responde con un error accionable.
+
+### `search_store_products`
+
+Busca directamente en una cadena. **Solo lectura.**
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `query` | string | Ej. `"leche descremada"` |
+| `store_id` | string | `jumbo` (defecto), `santaisabel`, `unimarc` |
+| `limit` | int | 1–50, defecto 10 |
+
+**Retorno:** lista de resultados del conector: `{name, brand, price, listPrice?, unitPrice, unit (kg\|lt\|un), url, sku, inStock, fetchedAt}`.
+
+### `add_product_from_store`
+
+Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula a un producto existente, y fija su match por cadena para que el precio se actualice en vivo. **Escritura con `dry_run=true` por defecto:** muestra la vista previa al usuario y repite con `dry_run=false` solo si la confirma.
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `store_id`, `store_url`, `store_product_name`, `unit`, `sku` | — | Copiados del resultado elegido (`url`, `name`, `unit`, `sku`) |
+| `canonical_name` | string | Nombre en el catálogo; si ya existe (sin distinguir mayúsculas), se **vincula** |
+| `category` | string | Defecto `otros` |
+| `product_id` | int \| null | Vincular explícitamente a un producto existente |
+| `dry_run` | bool | Defecto `true` |
+
+**Retorno:** `{dry_run, accion: crear|vincular, match: crear|reemplazar, producto: {product_id, canonical_name, category, default_unit, purchase_unit, purchase_size}, store: {...}}`. La unidad canónica se infiere de `unit` (kg → g, lt → ml, un → unidad) y el pack, del nombre ("1 kg", "900 ml", "20 un").
+
+**Errores accionables:** `unit` inválida; vincular un producto cuya unidad no es comparable (p. ej. `leche` en ml con un resultado por kg).
+
 ## Resource
 
 | URI | Descripción |
