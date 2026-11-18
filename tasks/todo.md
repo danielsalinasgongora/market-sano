@@ -52,10 +52,10 @@
 ### Task 5: Servidor MCP stdio + 3 tools de lectura + docs Claude Desktop
 **Descripción:** Entrypoint `mcp_server.py` (FastMCP pinneado `<3`) con `get_household_context`, `search_recipes` (versión inicial: query + tags, filtros de costo llegan en T11) y `get_pantry_status`; resource `household://{id}/context`; docs de conexión para Claude Desktop/Cursor.
 **Criterios de aceptación:**
-- [ ] `fastmcp dev backend/app/mcp_server.py` (o inspector MCP) ejecuta las 3 tools contra la semilla
-- [ ] `docs/mcp-tools.md` documenta contrato de cada tool (params/retorno/permisos)
-- [ ] `docs/clients/claude-desktop.md` con JSON de configuración stdio reproducible
-**Verificación:** Manual: conectar Claude Desktop y ejecutar `get_household_context` → devuelve hogar sembrado.
+- [x] `fastmcp dev backend/app/mcp_server.py` (o inspector MCP) ejecuta las 3 tools contra la semilla — verificado con el cliente MCP de FastMCP (in-memory) **y** un roundtrip stdio real (`StdioTransport` + `python -m app.mcp_server` como subproceso, igual que Claude Desktop) en `tests/test_mcp.py`
+- [x] `docs/mcp-tools.md` documenta contrato de cada tool (params/retorno/permisos/errores accionables + roadmap del contrato)
+- [x] `docs/clients/claude-desktop.md` con JSON de configuración stdio reproducible (Windows/macOS/Cursor + solución de problemas)
+**Verificación:** Manual: conectar Claude Desktop y ejecutar `get_household_context` → devuelve hogar sembrado. ✔ Automático verificado 2026-11-17 (28/28 tests: list_tools, call_tool, read_resource y stdio end-to-end). Conexión manual con Claude Desktop: pendiente del usuario como parte del Checkpoint A.
 **Dependencias:** T4. **Tamaño:** M
 **Archivos:** `backend/app/mcp_server.py`, `backend/app/mcp/tools_read.py`, `docs/mcp-tools.md`, `docs/clients/claude-desktop.md`
 
@@ -69,9 +69,9 @@
 **Archivos:** `.github/workflows/ci.yml`, `README.md`
 
 ### ✅ Checkpoint A — Criterio de salida Fase 0 (spec)
-- [ ] Cualquiera puede: `git clone` → `docker compose --profile minimal up` → conectar Claude Desktop vía stdio y ejecutar las 3 tools
-- [ ] CI verde; `/health` OK; migraciones aplicadas
-- [ ] **Revisión humana antes de Fase 1**
+- [ ] Cualquiera puede: `git clone` → `docker compose --profile minimal up` → conectar Claude Desktop vía stdio y ejecutar las 3 tools — automatizado verificado por tests (compose + semilla + stdio roundtrip); **pendiente tu prueba manual con Claude Desktop** siguiendo `docs/clients/claude-desktop.md`
+- [x] CI verde; `/health` OK; migraciones aplicadas (contenedor en `0001 (head)`, CI runs #1-#5 en verde)
+- [ ] **Revisión humana antes de Fase 1** — pendiente: conecta Claude Desktop y confirma que `get_household_context` devuelve tu hogar
 
 ---
 

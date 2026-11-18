@@ -45,7 +45,7 @@ docker compose up
 
 El backend expone tools MCP (`get_household_context`, `search_recipes`, `create_meal_plan`, `estimate_meal_plan_cost`, `generate_shopping_list`, `compare_basket_across_stores`, …) con reglas de seguridad claras: un agente puede armar y estimar planes en borrador, pero **confirmar un plan o registrar un gasto real exige un token emitido por un humano**.
 
-Guía de conexión con Claude Desktop: [`docs/clients/claude-desktop.md`](docs/clients/claude-desktop.md) *(se publica durante la Fase 0)*.
+Guía de conexión con Claude Desktop: [`docs/clients/claude-desktop.md`](docs/clients/claude-desktop.md). Contrato completo de tools y recursos: [`docs/mcp-tools.md`](docs/mcp-tools.md).
 
 ## 🗺️ Roadmap
 
