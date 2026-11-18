@@ -32,10 +32,10 @@
 ### Task 3: Modelo de datos completo (SQLModel) + migración inicial
 **Descripción:** Todas las tablas de spec §5 (users, households, household_members, household_preferences, invitations, product_catalog, recipes, recipe_ingredients, recipe_steps, recipe_tags, recipe_ratings, recipe_collections, recipe_collection_items, recipe_import_jobs, pantry_items, pantry_movements, meal_plans, meal_plan_entries, budget_snapshots, shopping_lists, shopping_list_items, price_snapshots, store_connectors, expenses, expense_items, expense_categories, api_tokens) con constraints e índices críticos.
 **Criterios de aceptación:**
-- [ ] Migración crea todas las tablas en BD limpia; smoke test inserta/lee un registro por tabla núcleo
-- [ ] Índices críticos: `price_snapshots(product_id, store_id, fetched_at DESC)`, `meal_plan_entries(plan_id, date)`, `pantry_items(household_id, product_id)`, `shopping_list_items(list_id, checked)`
-- [ ] Constraints: unique `(household_id, week_start)` en meal_plans; enums `role`, `status`, `meal_slot`, `source`, `confidence`
-**Verificación:** `pytest backend/tests -k models`; `alembic upgrade head` + `alembic downgrade base` + upgrade idempotente.
+- [x] Migración crea todas las tablas en BD limpia; smoke test inserta/lee un registro por tabla núcleo
+- [x] Índices críticos: `price_snapshots(product_id, store_id, fetched_at)` (índice plano con recorrido en reverso — un índice con expresión `desc()` no es refleable en SQLite; decisión documentada en el modelo), `meal_plan_entries(plan_id, date)`, `pantry_items(household_id, product_id)`, `shopping_list_items(list_id, checked)`
+- [x] Constraints: unique `(household_id, week_start)` en meal_plans; enums nativos `role`, `plan_status`, `meal_slot`, `price_source`, `price_confidence` (+`pantry_location`, `movement_reason`, `difficulty`, import y list status) con valores limpios en minúsculas; CHECK `rating BETWEEN 1 AND 5`
+**Verificación:** `pytest backend/tests -k models`; `alembic upgrade head` + `alembic downgrade base` + upgrade idempotente. ✔ Verificado 2026-11-17: 15/15 tests verdes (tests corren contra la migración real, no `create_all`); ciclo upgrade→downgrade→upgrade OK local y en contenedor (`alembic current` → `0001 (head)`); SQLModel 0.0.50 usa `UTCDateTime` que exige datetimes con timezone (refuerza la convención UTC).
 **Dependencias:** T2. **Tamaño:** M
 **Archivos:** `backend/app/models/`, `backend/migrations/versions/0001_initial.py`, `backend/tests/test_models.py`
 

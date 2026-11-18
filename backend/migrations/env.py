@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
+import app.models  # noqa: F401 - registra todas las tablas en SQLModel.metadata
 from app.settings import get_settings
 
 config = context.config
@@ -14,12 +15,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Metadata de SQLModel (las tablas se registran en la Task 3).
+# Metadata completo del proyecto.
 target_metadata = SQLModel.metadata
 
-# La URL siempre proviene de la configuración de la app (env/.env),
-# nunca hardcodeada en este archivo.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# La URL siempre viene de la configuración de la app (env/.env), salvo que el
+# invocador la haya fijado explícitamente (tests con BD temporal, tooling).
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 
 def run_migrations_offline() -> None:
