@@ -19,7 +19,20 @@ python -m venv .venv
 .venv\Scripts\python -m app.seed
 ```
 
-> Con Docker: `docker compose up -d` seguido de `docker compose exec -T app python -m app.seed`. Para el cliente MCP stdio se usa el Python local (mismo disco, misma base).
+> **Con Docker (recomendado si quieres precios en vivo):** `docker compose up -d` y luego `docker compose exec -T app python -m app.seed`. El servidor MCP corre **dentro** del contenedor (misma base, conector incluido) y Claude Desktop le habla por `docker exec -i`:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "market-sano": {
+>       "command": "docker",
+>       "args": ["exec", "-i", "market-sano-app-1", "python", "-m", "app.mcp_server"]
+>     }
+>   }
+> }
+> ```
+>
+> Requiere que el contenedor esté corriendo. Con esta opción puedes saltarte la sección 2.
 
 ## 2. Registrar el servidor en Claude Desktop
 
