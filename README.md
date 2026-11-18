@@ -4,6 +4,7 @@
 
 > Planifica tus comidas con tu presupuesto y los **precios reales** de los supermercados chilenos. Local-first, open-source y MCP-first.
 
+[![CI](https://github.com/danielsalinasgongora/market-sano/actions/workflows/ci.yml/badge.svg)](https://github.com/danielsalinasgongora/market-sano/actions/workflows/ci.yml)
 [![Licencia: GPL-3.0-or-later](https://img.shields.io/badge/licencia-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 **Market Sano** (antes *Rinde La Olla*) es un planificador semanal de comidas y compras para Chile que corrige lo que las apps comerciales ignoran deliberadamente: **los precios que ves son los precios que pagas en caja**, y tus datos son tuyos.

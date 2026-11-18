@@ -11,11 +11,11 @@
 ### Task 1: Repo público GitHub + licencia GPL-3.0-or-later + docs de comunidad
 **Descripción:** Monorepo público según Anexo C de la spec en https://github.com/danielsalinasgongora/market-sano (repo creado por el usuario, URL entregada). El agente configura `origin` y hace el push inicial. Copia la spec v2.0 a `docs/spec.md` corrigiendo **licencia** (AGPL→GPL-3.0-or-later) y **nombre de producto** (Rinde La Olla→Market Sano), con anotaciones ✔ en las decisiones resueltas de §9.
 **Criterios de aceptación:**
-- [ ] `LICENSE` con texto completo GPL v3; headers de código con SPDX `GPL-3.0-or-later`
-- [ ] README (español) con filosofía, quickstart `docker compose up`, badges CI; CONTRIBUTING.md; CODE_OF_CONDUCT.md
-- [ ] Estructura monorepo: `backend/app/{api,models,services,mcp,connectors,ai,mqtt}`, `backend/migrations`, `backend/tests`, `frontend/`, `docs/`, `docker/`, `docker-compose.yml` en raíz, `.env.example` (variables de spec §3.11), `.gitignore` (Python+Node+`data/`+`backups/`)
-- [ ] `docs/spec.md` = spec v2.0 con licencia corregida
-**Verificación:** `git clone` desde la URL pública funciona; `docker compose config` valida sin errores.
+- [x] `LICENSE` con texto completo GPL v3; headers de código con SPDX `GPL-3.0-or-later`
+- [x] README (español) con branding **Market Sano**, filosofía, quickstart `docker compose up`, badges CI; CONTRIBUTING.md; CODE_OF_CONDUCT.md
+- [x] Estructura monorepo: `backend/app/{api,models,services,mcp,connectors,ai,mqtt}`, `backend/migrations`, `backend/tests`, `frontend/`, `docs/`, `docker/`, `docker-compose.yml` en raíz, `.env.example` (variables de spec §3.11), `.gitignore` (Python+Node+`data/`+`backups/`)
+- [x] `docs/spec.md` = spec v2.0 con licencia y nombre corregidos
+**Verificación:** `git clone` desde la URL pública funciona; `docker compose config` valida sin errores. ✔ Verificado 2026-11-17 (push 8b6f527 + compose config OK).
 **Dependencias:** Ninguna (el push inicial requiere la URL del repo que entrega el usuario). **Tamaño:** S
 **Archivos:** `LICENSE`, `README.md`, `docs/spec.md`, `.env.example`, `docker-compose.yml`, `.gitignore`
 
