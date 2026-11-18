@@ -36,6 +36,7 @@ docker compose up
 ```
 
 - API + documentación OpenAPI: <http://localhost:8000/docs>
+- Datos de ejemplo (catálogo chileno + recetas): `docker compose exec -T app python -m app.seed`
 - Perfiles: `--profile standard` añade PostgreSQL 16 · `--profile full` añade MQTT (Home Assistant) y el conector de supermercados.
 
 > ⚠️ **Estado actual: Fase 0 (esqueleto) en curso.** El quickstart completo será funcional al cierre de la Fase 0. Progreso y hoja de ruta en [`tasks/todo.md`](tasks/todo.md); diseño completo en [`docs/spec.md`](docs/spec.md).

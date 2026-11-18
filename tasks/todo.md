@@ -42,10 +42,10 @@
 ### Task 4: Semilla de datos chilena
 **Descripción:** Script idempotente con catálogo (~100 productos, aliases "palta"/"aguacate", "poroto"/"frijol"), 10–15 recetas chilenas estructuradas (cazuela, charquicán, pastel de choclo, porotos con riendas…), tabla de equivalencias de cocina (Anexo A), categorías de gasto, hogar por defecto (`AUTH_MODE=none`, `default_weekly_budget_clp=45000`), registry de conectores y algunos ítems de despensa de demo.
 **Criterios de aceptación:**
-- [ ] `python -m app.seed` re-ejecutable sin duplicar (upserts)
-- [ ] Toda receta resuelve 100% de ingredientes a `product_id` del catálogo con unidad canónica
-- [ ] Cada producto tiene `default_unit` y, si es comprable, `purchase_unit`/`purchase_size`
-**Verificación:** `pytest backend/tests -k seed`; revisar 2 recetas muestreadas vía `/docs` (Swagger).
+- [x] `python -m app.seed` re-ejecutable sin duplicar (upserts; además aplica migraciones pendientes solo, funciona sobre BD recién creada)
+- [x] Toda receta resuelve 100% de ingredientes a `product_id` del catálogo con unidad canónica (test por receta: unidad == `default_unit` del producto)
+- [x] Cada producto tiene `default_unit` y, si es comprable, `purchase_unit`/`purchase_size` (101 productos con aliases: "palta"/"aguacate", "porotos"/"frijol")
+**Verificación:** `pytest backend/tests -k seed`; CLI corrido 2 veces local y en contenedor. ✔ Verificado 2026-11-17: 20/20 tests verdes (incluye test de CLI vía subprocess); recetas muestreadas por consulta directa (el endpoint de recetas llega con T10); `despensa_demo: 0` en la segunda corrida.
 **Dependencias:** T3. **Tamaño:** M
 **Archivos:** `backend/app/seed.py`, `backend/app/seed_data/` (catálogo, recetas, equivalencias)
 
