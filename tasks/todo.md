@@ -62,9 +62,9 @@
 ### Task 6: CI GitHub Actions
 **Descripción:** Workflow con `ruff check` + `pytest` sobre Python 3.12; badge en README. El job de frontend se añade cuando exista (T24).
 **Criterios de aceptación:**
-- [ ] Push/PR dispara CI y pasa en verde
-- [ ] README muestra badge de estado
-**Verificación:** Primer run verde en GitHub Actions.
+- [x] Push/PR dispara CI y pasa en verde
+- [x] README muestra badge de estado
+**Verificación:** Primer run verde en GitHub Actions. ✔ Verificado 2026-11-17 (run #1: ruff + pytest en Python 3.12, 39 s).
 **Dependencias:** T2 (paralelizable con T3–T5). **Tamaño:** S
 **Archivos:** `.github/workflows/ci.yml`, `README.md`
 
