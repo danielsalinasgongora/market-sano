@@ -1,0 +1,56 @@
+# Market Sano — docker compose
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# `docker compose up` levanta el perfil mínimo (app + SQLite).
+# `--profile standard` añade PostgreSQL 16.
+# `--profile full` añade MQTT (Home Assistant) y el conector de supermercados.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/app.db
+      AUTH_MODE: ${AUTH_MODE:-none}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:16-alpine
+    profiles: ["standard", "full"]
+    environment:
+      POSTGRES_USER: marketsano
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketsano}
+      POSTGRES_DB: marketsano
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketsano"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Se completa en la Fase 1 (integración del conector mcp-supermercados-cl):
+  # connector:
+  #   image: node:20-slim
+  #   profiles: ["full"]
+  #   ...
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    profiles: ["full"]
+    ports:
+      - "1883:1883"
+    # Config completa en la Fase 4 (MQTT Discovery para Home Assistant)
+
+volumes:
+  pgdata:
