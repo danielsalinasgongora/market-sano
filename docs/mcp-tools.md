@@ -76,6 +76,32 @@ Estado de la despensa (spec §3.3): cantidades por producto, ubicación e ítems
 
 **Retorno:** lista de `{product_id, product_name, quantity, unit, location, expires_at}` (ISO 8601 o null).
 
+## Tools de recetas (Task 10)
+
+Con `AUTH_MODE=none` el invocador actúa como owner implícito del hogar por defecto. Los permisos por rol y token llegan en T15.
+
+### `get_recipe`
+
+`recipe_id` → `{recipe_id, household_id, title, description, base_servings, prep_minutes, cook_minutes, difficulty, instructions (Markdown), ingredients[{product_id, product_name, quantity, unit, optional, notes}], steps[{step_number, instruction, duration_minutes}], tags, rating_avg, rating_count}`.
+
+### `create_recipe`
+
+Crea una receta propia del hogar. **Escritura con `dry_run=true` por defecto.**
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `title` | string | |
+| `ingredients` | list | `{product, quantity, unit, optional?, notes?}`. `product` es un nombre/alias del catálogo o un `product_id`; `unit` es la del catálogo (`g`, `ml`, `unidad`) o una convertible (`kg`, `L`, `cc`) |
+| `steps` | list \| null | `{instruction, duration_minutes?}` en orden |
+| `base_servings`, `prep_minutes`, `cook_minutes`, `difficulty`, `description`, `instructions`, `tags` | — | Opcionales; `difficulty`: `facil`, `media` o `dificil` |
+| `dry_run` | bool | Defecto `true`: valida y devuelve la vista previa sin guardar |
+
+**Errores accionables:** si un ingrediente no está en el catálogo, sugiere nombres parecidos y `add_product_from_store`; también hay error si la unidad es incompatible con la del producto. Las recetas de la semilla son de solo lectura (la edición es por API, `PUT /api/v1/recipes/{id}`, solo para recetas propias).
+
+### `rate_recipe`
+
+`recipe_id`, `rating` (1–5) → `{recipe_id, your_rating, rating_avg, rating_count}`. Una calificación por usuario; repetir la reemplaza.
+
 ## Tools del catálogo abierto (Task 9b)
 
 Requieren el conector de supermercados (`SUPERMERCADOS_ENABLED=true`, ver [docs/connectors](connectors/README.md)). Sin él, `search_store_products` responde con un error accionable.
@@ -119,7 +145,7 @@ Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula
 | Fase del plan | Agregados |
 |---|---|
 | Task 11 | Filtros de costo/tiempo y `only_with_pantry_match` en `search_recipes` |
-| Task 10+ | `create_recipe` (con `dry_run`), `rate_recipe`, `get_recipe`, `scale_recipe` |
+| Task 11 | `scale_recipe`, `get_recipe_cost` |
 | Task 14–22 | Planificación, listas, comparación de cadenas y gastos; tokens de confirmación |
 | Task 23 | Transporte HTTP (streamable) + prompts `plan_week_within_budget`, `suggest_meals_from_pantry`, `compare_current_basket` |
 

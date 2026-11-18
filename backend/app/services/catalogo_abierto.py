@@ -22,7 +22,7 @@ _TAMANO = re.compile(
     r"(\d+(?:[.,]\d+)?)\s*(kg|kilos?|g|gr|grs|l|lt|lts|litros?|ml|cc|un|unid|unidades)\b\.?",
     re.IGNORECASE,
 )
-_FACTOR = {  # unidad del nombre → (unidad canónica, factor)
+FACTOR_UNIDAD = {  # unidad escrita → (unidad canónica, factor)
     "kg": ("g", 1000), "kilo": ("g", 1000), "kilos": ("g", 1000),
     "g": ("g", 1), "gr": ("g", 1), "grs": ("g", 1),
     "l": ("ml", 1000), "lt": ("ml", 1000), "lts": ("ml", 1000),
@@ -39,7 +39,7 @@ class AltaInvalida(ValueError):
 def inferir_pack(nombre: str, unidad_canonica: str) -> tuple[str | None, float | None]:
     """(purchase_unit, purchase_size) desde el nombre, si es coherente con la unidad."""
     for cantidad, unidad in reversed(_TAMANO.findall(nombre)):
-        canonica, factor = _FACTOR[unidad.lower()]
+        canonica, factor = FACTOR_UNIDAD[unidad.lower()]
         if canonica == unidad_canonica:
             return f"{cantidad} {unidad}", float(cantidad.replace(",", ".")) * factor
     return None, None

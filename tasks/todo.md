@@ -132,10 +132,10 @@
 ### Task 10: CRUD de recetas + create_recipe (dry_run) + rate_recipe
 **Descripción:** Subida de recetas propias del usuario: API y MCP para crear/editar recetas con ingredientes estructurados (→`product_id`), **instrucciones de preparación** (texto Markdown y pasos ordenados con duración), tags; `create_recipe` con `dry_run=true` por defecto (preview sin escribir); calificación 1–5 para el futuro aprendizaje de gustos.
 **Criterios de aceptación:**
-- [ ] Alta vía API con ingredientes, pasos y tags; validación: todo ingrediente resuelve al catálogo
-- [ ] `create_recipe` MCP con `dry_run=true` devuelve preview sin tocar BD; con `false` crea y devuelve `recipe_id`
-- [ ] `rate_recipe` guarda rating y devuelve promedio
-**Verificación:** `pytest backend/tests -k recipes_crud`; llamada MCP dry_run desde inspector.
+- [x] Alta vía API con ingredientes, pasos y tags; validación: todo ingrediente resuelve al catálogo
+- [x] `create_recipe` MCP con `dry_run=true` devuelve preview sin tocar BD; con `false` crea y devuelve `recipe_id`
+- [x] `rate_recipe` guarda rating y devuelve promedio
+**Verificación:** `pytest backend/tests -k recipes_crud`; llamada MCP dry_run desde inspector. ✔ Verificado 2026-11-18: 7 tests (CRUD completo por API con instrucciones Markdown + pasos con duración, dry_run sin escritura, ingrediente desconocido con sugerencias, alias "aguacate"→palta, kg→g, unidad incompatible, semilla de solo lectura, rating reemplaza/promedia/valida 1-5, tools MCP create_recipe/rate_recipe/get_recipe). API: `GET/POST /api/v1/recipes`, `GET/PUT/DELETE /api/v1/recipes/{id}`, `POST /api/v1/recipes/{id}/ratings`. Con `AUTH_MODE=none` las escrituras se atribuyen a un owner local implícito (`services/identidad.py`), que T13 reemplaza. Inspector MCP manual: pendiente del usuario.
 **Dependencias:** T4. **Tamaño:** M
 **Archivos:** `backend/app/services/recipes.py`, `backend/app/api/recipes.py`, `backend/app/mcp/tools_recipes.py`
 

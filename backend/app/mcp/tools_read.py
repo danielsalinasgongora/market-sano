@@ -20,10 +20,9 @@ from app.models import (
     HouseholdPreference,
     PantryItem,
     ProductCatalog,
-    Recipe,
-    RecipeTag,
 )
 from app.models.enums import PantryLocation
+from app.services.recipes import buscar_recetas
 
 
 def _hogar(session: Session, household_id: int | None) -> Household:
@@ -81,32 +80,7 @@ def search_recipes(
     capa de costos por porción (Task 11 del plan).
     """
     with Session(mcp_engine()) as session:
-        recetas = session.exec(select(Recipe)).all()
-        etiquetas_por_receta: dict[int, set[str]] = {}
-        for fila in session.exec(select(RecipeTag)).all():
-            etiquetas_por_receta.setdefault(fila.recipe_id, set()).add(fila.tag)
-
-        texto = query.strip().lower()
-        requeridas = set(tags or [])
-        resultado: list[dict[str, Any]] = []
-        for receta in recetas:
-            if texto and texto not in receta.title.lower():
-                if texto not in (receta.description or "").lower():
-                    continue
-            if requeridas and not requeridas.issubset(etiquetas_por_receta.get(receta.id, set())):
-                continue
-            resultado.append(
-                {
-                    "recipe_id": receta.id,
-                    "title": receta.title,
-                    "base_servings": receta.base_servings,
-                    "time_minutes": (receta.prep_minutes or 0) + (receta.cook_minutes or 0),
-                    "difficulty": receta.difficulty.value if receta.difficulty else None,
-                    "tags": sorted(etiquetas_por_receta.get(receta.id, set())),
-                }
-            )
-        resultado.sort(key=lambda r: r["title"].lower())
-        return resultado[:max_results]
+        return buscar_recetas(session, query, tags, max_results)
 
 
 @mcp.tool
