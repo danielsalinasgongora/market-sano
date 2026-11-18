@@ -32,3 +32,6 @@ backups/
 Thumbs.db
 .idea/
 .vscode/
+
+# Grafo de conocimiento local (graphify)
+graphify-out/

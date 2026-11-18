@@ -90,10 +90,10 @@
 ### Task 8: Spike del conector mcp-supermercados-cl — 🔀 PUERTA DE DECISIÓN
 **Descripción:** Evaluar en la máquina del usuario (Node.js local) el paquete upstream (MIT): fetch directo Jumbo/Santa Isabel/Unimarc, latencias, formato (`price`, `listPrice`, `memberPrice`, `unitPrice`), y mapeo `canonical_name → query` para 20 productos del catálogo. Definir modo de integración (recomendado: backend como **cliente MCP** vía stdio-subprocess con FastMCP Client).
 **Criterios de aceptación:**
-- [ ] `docs/connectors/spike-2026-11.md` con evidencia: ≥10 productos traídos live por cadena, latencias, y fallos documentados (Líder/Tottus esperados bloqueados)
-- [ ] Mapeo de 20 productos del catálogo resuelto a producto concreto del retailer (mejor PPUM)
-- [ ] Decisión escrita: integrar upstream tal cual / adaptador propio / mixto, con justificación
-**Verificación:** Manual en máquina del usuario; documentar comandos exactos ejecutados.
+- [x] `docs/connectors/spike-2026-11.md` con evidencia: ≥10 productos traídos live por cadena, latencias, y fallos documentados (Líder/Tottus esperados bloqueados)
+- [x] Mapeo de 20 productos del catálogo resuelto a producto concreto del retailer (mejor PPUM)
+- [x] Decisión escrita: integrar upstream tal cual / adaptador propio / mixto, con justificación
+**Verificación:** Manual en máquina del usuario; documentar comandos exactos ejecutados. ✔ Verificado 2026-11-18: 60/60 búsquedas live (20 productos × Jumbo/Santa Isabel/Unimarc) vía `fastmcp.Client` stdio; medianas 216/194/1119 ms; Tottus 403 y Líder antibot. Regla de mapeo ingenua ~70 % de acierto → **decisión: mixto** (upstream como fuente vía cliente MCP stdio + matching propio con `product_store_matches` adelantada a T9). Impactos para T9: PPUM sin unidad en `price_snapshots`, peso medio por unidad para productos a granel, Node en la imagen `full`. Scripts en `docs/connectors/spike/`.
 **Dependencias:** T7 (contrato), Node.js en host. **Tamaño:** M
 **Archivos:** `docs/connectors/spike-2026-11.md`, `docs/connectors/` (evidencias)
 
