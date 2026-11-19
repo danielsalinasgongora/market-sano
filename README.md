@@ -40,7 +40,7 @@ docker compose up
 - Perfiles: `--profile standard` añade PostgreSQL 16 · `--profile full` añade MQTT (Home Assistant).
 - Precios en vivo (Jumbo, Santa Isabel, Unimarc): `SUPERMERCADOS_ENABLED=true docker compose up` — ver [docs/connectors](docs/connectors/README.md).
 
-> ⚠️ **Estado actual: Fase 0 (esqueleto) en curso.** El quickstart completo será funcional al cierre de la Fase 0. Progreso y hoja de ruta en [`tasks/todo.md`](tasks/todo.md); diseño completo en [`docs/spec.md`](docs/spec.md).
+> ⚠️ **Estado actual: Fase 2 (núcleo vía API/MCP).** El backend, los precios reales y el recetario con costos ya funcionan; la interfaz web (PWA) llega en la Fase 3. Progreso y hoja de ruta en [`tasks/todo.md`](tasks/todo.md); diseño completo en [`docs/spec.md`](docs/spec.md).
 
 ## 🤖 Operarlo con un agente (MCP)
 

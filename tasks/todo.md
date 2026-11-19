@@ -120,10 +120,10 @@
 **Archivos:** `backend/app/api/products.py`, `backend/app/mcp/tools_catalog.py`, `backend/app/models/catalog.py`, `backend/migrations/versions/0002_*.py`
 
 ### ✅ Checkpoint B — Precios reales operativos
-- [x] Costo de una receta semilla calculado con precio **live de Jumbo** y con precio manual; ambos con metadatos correctos — 2026-11-18, Charquicán: 6 ingredientes live Jumbo + 4 manuales → $11.792 ($2.948/porción), cada línea con `source`/`confidence_efectiva` (cálculo en script e2e; el servicio `get_recipe_cost` llega en T11)
-- [x] Degradación live→cache→manual verificada end-to-end — conector caído real → último precio con `confidence_efectiva=low` + `warning`; manual no se degrada
-- [x] Búsqueda en cadena viva (`search_store_products`) y alta de producto al catálogo (`add_product_from_store`) verificadas (T9b) — vía API con conector real; vía MCP con conector falso
-- [ ] **Revisión humana antes de Fase 2**
+- [x] Costo de una receta semilla calculado con precio **live de Jumbo** y con precio manual; ambos con metadatos correctos — 2026-11-18, Charquicán re-verificado con `get_recipe_cost` (T11): **$10.517 total / $2.629 por porción**, 5 ingredientes live + 5 manuales, cada línea con `source`/`confidence`/`unit_price_clp`/`is_stale`
+- [x] Degradación live→cache→manual verificada end-to-end — conector caído real (`SUPERMERCADOS_COMMAND` inexistente, TTL=0): respuesta `source=live` → `source_efectiva=cached`, `confidence_efectiva=low`, `is_stale=true` + `warning`; sin excepciones
+- [x] Búsqueda en cadena viva (`search_store_products`) y alta de producto al catálogo (`add_product_from_store`) verificadas (T9b) — Jumbo live: "quinoa" → 3 resultados con PPUM; alta con `dry_run=true` → preview (`vincular`, pack 250 g) sin escribir (catálogo sigue en 102 productos y el match no cambia)
+- [x] **Revisión humana antes de Fase 2** — ✔ 2026-11-18: revisión delegada al agente a pedido del usuario, con evidencia e2e contra el contenedor reconstruido (ver ítems anteriores)
 
 ---
 
@@ -142,12 +142,12 @@
 ### Task 11: Búsqueda con filtros + escalado + costo por porción
 **Descripción:** `search_recipes` (query, tags AND, `max_cost_per_serving`, `max_time_minutes`), `scale_recipe` con reglas Anexo A (huevos ceil, peso/volumen 1 decimal), `get_recipe_cost` vía PriceService. (`only_with_pantry_match` se completa en T19.)
 **Criterios de aceptación:**
-- [ ] Búsqueda filtra por costo con precios de la semilla manual; orden por costo/rating
-- [ ] `scale_recipe(2 porciones→5)` respeta reglas de redondeo (caso huevo probado)
-- [ ] `get_recipe_cost` expone desglose por ingrediente con metadatos de precio
-**Verificación:** `pytest backend/tests -k search_scale_cost`.
+- [x] Búsqueda filtra por costo con precios de la semilla manual; orden por costo/rating
+- [x] `scale_recipe(2 porciones→5)` respeta reglas de redondeo (caso huevo probado)
+- [x] `get_recipe_cost` expone desglose por ingrediente con metadatos de precio
+**Verificación:** `pytest backend/tests -k search_scale_cost`. ✔ Verificado 2026-11-18: 4 tests nuevos (66 totales). Filtros combinables por costo/tiempo con orden `title|cost|rating` (las recetas con precios incompletos quedan fuera del filtro de costo y al final del orden por costo); `scale_recipe` aplica ceil a `unidad` (huevo 3→3.75→4; semilla Empanadas 12→5: 1.25→2) y 1 decimal a g/ml; `get_recipe_cost` usa el último precio por ingrediente en una sola consulta (`get_latest_prices`), calcula con PPUM (`g→CLP/kg`, `ml→CLP/L`, `unidad→CLP/unidad`) y expone `source`/`confidence`/`fetched_at`/`is_stale` por línea, con `is_complete`+`warning` si falta algún precio. La semilla no trae precios: los tests registran precios manuales y el e2e usó live+manual reales. Endpoints nuevos: `GET /api/v1/recipes/{id}/scale`, `GET /api/v1/recipes/{id}/cost`; tools MCP `scale_recipe` y `get_recipe_cost`. E2E en contenedor reconstruido: Charquicán → $10.517 total ($2.629/porción), 5 líneas live Jumbo + 5 manuales, todas con metadatos.
 **Dependencias:** T7, T10. **Tamaño:** M
-**Archivos:** `backend/app/services/recipes.py`, `backend/app/services/units.py`, `backend/app/mcp/tools_recipes.py`
+**Archivos:** `backend/app/services/recipes.py`, `backend/app/services/units.py`, `backend/app/services/prices.py`, `backend/app/api/recipes.py`, `backend/app/mcp/tools_recipes.py`, `backend/tests/test_search_scale_cost.py`
 
 ### Task 12: Importación de recetas desde URL (JSON-LD)
 **Descripción:** `recipe-scrapers` para importar desde URL creando `recipe_import_jobs`; `import_recipe` MCP con `dry_run`; mapeo best-effort de ingredientes al catálogo por alias con marcado de no-resueltos.
