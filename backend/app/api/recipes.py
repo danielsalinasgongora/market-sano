@@ -9,6 +9,7 @@ from sqlmodel import Session
 
 from app.db import get_session
 from app.services.identidad import SinHogar, owner_implicito
+from app.services.imports import ImportInvalido, importar_desde_url
 from app.services.recipes import (
     NoEncontrada,
     RecetaIn,
@@ -31,13 +32,17 @@ class CalificacionIn(BaseModel):
     rating: int = Field(ge=1, le=5)
 
 
+class ImportacionIn(BaseModel):
+    url: str = Field(min_length=1, max_length=2000)
+
+
 def _errores(fn: Any) -> Any:
     """Traduce errores de dominio a HTTP con el mensaje accionable."""
     try:
         return fn()
     except NoEncontrada as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (RecetaInvalida, SinHogar) as exc:
+    except (RecetaInvalida, ImportInvalido, SinHogar) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -69,6 +74,22 @@ def crear(datos: RecetaIn, session: SesionDep, dry_run: bool = False) -> dict[st
     def accion() -> dict[str, Any]:
         hogar, usuario = owner_implicito(session)
         return crear_receta(session, hogar.id, datos, dry_run=dry_run, created_by=usuario.id)
+    return _errores(accion)
+
+
+@router.post("/api/v1/recipes/imports")
+def importar(datos: ImportacionIn, session: SesionDep, dry_run: bool = True) -> dict[str, Any]:
+    """Importa una receta desde una URL con JSON-LD (schema.org/Recipe).
+
+    Con `dry_run=true` (defecto) devuelve la vista previa y no guarda nada; con
+    `dry_run=false` crea la receta y deja el `recipe_import_job` con su estado.
+    Los ingredientes que no se pueden mapear al catálogo vuelven en `unresolved`.
+    """
+    def accion() -> dict[str, Any]:
+        hogar, usuario = owner_implicito(session)
+        return importar_desde_url(
+            session, hogar.id, datos.url, dry_run=dry_run, created_by=usuario.id
+        )
     return _errores(accion)
 
 

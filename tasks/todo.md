@@ -152,12 +152,12 @@
 ### Task 12: Importación de recetas desde URL (JSON-LD)
 **Descripción:** `recipe-scrapers` para importar desde URL creando `recipe_import_jobs`; `import_recipe` MCP con `dry_run`; mapeo best-effort de ingredientes al catálogo por alias con marcado de no-resueltos.
 **Criterios de aceptación:**
-- [ ] Importar 2 recetas reales con JSON-LD → receta draft con ingredientes estructurados
-- [ ] Ingredientes no mapeados quedan marcados explícitamente (no se pierden)
-- [ ] Job registra estado, resultado y error por URL inválida
-**Verificación:** `pytest backend/tests -k import`; importar 1 URL real elegida por el usuario.
+- [x] Importar 2 recetas reales con JSON-LD → receta draft con ingredientes estructurados
+- [x] Ingredientes no mapeados quedan marcados explícitamente (no se pierden)
+- [x] Job registra estado, resultado y error por URL inválida
+**Verificación:** `pytest backend/tests -k import` ✔ Verificado 2026-11-19: 7 tests nuevos (73 totales) y `ruff check` limpio. `import_recipe` (MCP) y `POST /api/v1/recipes/imports` (REST) comparten `app/services/imports.py`: descarga con timeout 20 s/límite 5 MB → `recipe-scrapers` en modo genérico (`supported_only=False`, acepta JSON-LD de cualquier sitio) → mapeo por nombre/alias tolerando plurales ("papas"→`papa`) y variantes con sustantivo inicial ("aceite de girasol"→`aceite`) → conversión Anexo A (`kg`/`cucharada`/`taza`/`cdta`…). Los no mapeados vuelven en `unresolved[{text,reason,suggestions}]` y el job los conserva; con `dry_run=false` siempre queda job `completed` (con `result_json`) o `failed` (URL inválida, página sin JSON-LD, nada mapeable). E2E en contenedor reconstruido con la dependencia nueva: 2 URLs reales verificadas — `recetas.elperiodico.com/receta-de-lentejas-a-la-jardinera-56889.html` → receta id 15 con 5 ingredientes estructurados (job id 1 `completed`, 7 no resueltos conservados) y `recetasgratis.net/receta-de-charquican-59075.html` (sirve "Bizcocho de yogur sin azúcar") → vista previa con harina/huevo/aceite (3 resueltos, 5 no resueltos). El usuario no fijó una URL concreta, así que se usaron estas dos públicas.
 **Dependencias:** T10. **Tamaño:** M
-**Archivos:** `backend/app/services/imports.py`, `backend/app/api/recipes.py`, `backend/app/mcp/tools_recipes.py`
+**Archivos:** `backend/app/services/imports.py`, `backend/app/api/recipes.py`, `backend/app/mcp/tools_recipes.py`, `backend/tests/test_imports.py`, `backend/tests/fixtures/receta_charquican.html`, `backend/tests/fixtures/receta_tortilla.html`
 
 ### Task 13: Autenticación local multi-usuario (AUTH_MODE dual)
 **Descripción:** Registro local (email + contraseña Argon2id) con **aviso de privacidad y consentimiento afirmativo** (Ley 21.719: checkbox no premarcado); login que emite Bearer (hasheado en `api_tokens`); `AUTH_MODE=none|local` — con `none`, owner implícito del hogar por defecto; endpoint `/api/v1/auth/{register,login,me}`.

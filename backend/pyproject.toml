@@ -22,12 +22,14 @@ dependencies = [
     "pydantic-settings>=2.4",
     # MCP: pin a la línea 2.x (3.x/4.x en desarrollo con breaking changes; se re-evalúa en Fase 4)
     "fastmcp>=2.9,<3",
+    # Importación de recetas desde URL (Task 12): JSON-LD de sitios de cocina + fetch HTTP
+    "recipe-scrapers>=15",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.27",
     "ruff>=0.6",
 ]
 

@@ -85,7 +85,7 @@ Estado de la despensa (spec §3.3): cantidades por producto, ubicación e ítems
 
 **Retorno:** lista de `{product_id, product_name, quantity, unit, location, expires_at}` (ISO 8601 o null).
 
-## Tools de recetas (Task 10–11)
+## Tools de recetas (Task 10–12)
 
 Con `AUTH_MODE=none` el invocador actúa como owner implícito del hogar por defecto. Los permisos por rol y token llegan en T15.
 
@@ -106,6 +106,44 @@ Crea una receta propia del hogar. **Escritura con `dry_run=true` por defecto.**
 | `dry_run` | bool | Defecto `true`: valida y devuelve la vista previa sin guardar |
 
 **Errores accionables:** si un ingrediente no está en el catálogo, sugiere nombres parecidos y `add_product_from_store`; también hay error si la unidad es incompatible con la del producto. Las recetas de la semilla son de solo lectura (la edición es por API, `PUT /api/v1/recipes/{id}`, solo para recetas propias).
+
+### `import_recipe`
+
+Importa una receta desde una URL que publique datos estructurados JSON-LD (`schema.org/Recipe`). **Escritura con `dry_run=true` por defecto.** También disponible por REST: `POST /api/v1/recipes/imports?dry_run=true|false`.
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `url` | string | `http://` o `https://`; debe apuntar a una receta con JSON-LD |
+| `dry_run` | bool | Defecto `true`: devuelve la vista previa sin guardar |
+
+**Pipeline:** descarga el HTML (20 s de timeout, 5 MB máximo) → extrae título, porciones, tiempos, etiquetas y pasos con `recipe-scrapers` → mapea cada ingrediente al catálogo por nombre/alias (tolera plurales y variantes como "aceite de girasol" → `aceite`) → convierte medidas caseras (`kg`, `cucharada`, `taza`, …) a la unidad canónica con el Anexo A.
+
+**Retorno:** `{dry_run, job_id, recipe_id, title, description, base_servings, prep_minutes, cook_minutes, instructions, steps[], tags[], source_url, ingredients[{product_id, product_name, quantity, unit, raw_text}], unresolved[{text, reason, suggestions[]}], is_complete, warning?}`.
+
+- Los ingredientes que no se pueden mapear o convertir **no se pierden ni se inventan**: vuelven en `unresolved` con el motivo y sugerencias del catálogo, y la receta se crea solo con los resueltos (`is_complete=false`, `warning` accionable).
+- Con `dry_run=false` **siempre** queda un `recipe_import_job`: `completed` con `result_json`, o `failed` con `error_message` (URL inválida, página sin JSON-LD, sin ingredientes mapeables). Con `dry_run=true` no se persiste nada.
+
+```json
+{
+  "dry_run": false,
+  "job_id": 7,
+  "recipe_id": 21,
+  "title": "Lentejas a la jardinera",
+  "base_servings": 4,
+  "ingredients": [
+    {"product_id": 31, "product_name": "lentejas", "quantity": 300.0,
+     "unit": "g", "raw_text": "300 gramos de Lentejas"}
+  ],
+  "unresolved": [
+    {"text": "2 ramas de Tomillo", "reason": "'Tomillo' no está en el catálogo",
+     "suggestions": []}
+  ],
+  "is_complete": false,
+  "warning": "1 ingrediente(s) no se pudieron estructurar (2 ramas de Tomillo); quedaron en el job para revisarlos con add_product_from_store."
+}
+```
+
+**Errores accionables:** URL inválida o no descargable; la página no expone JSON-LD; ningún ingrediente se pudo estructurar (sugiere agregar productos con `add_product_from_store` o importar con texto pegado).
 
 ### `rate_recipe`
 

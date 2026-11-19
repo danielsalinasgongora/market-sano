@@ -60,6 +60,7 @@ class RecetaIn(BaseModel):
     cook_minutes: int | None = Field(default=None, ge=0)
     difficulty: Difficulty | None = None
     instructions: str | None = Field(default=None, description="Markdown")
+    source_url: str | None = Field(default=None, max_length=2000)
     ingredients: list[IngredienteIn] = Field(min_length=1)
     steps: list[PasoIn] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
@@ -111,6 +112,7 @@ def _vista(datos: RecetaIn, resueltos: list, recipe_id: int | None) -> dict[str,
         "base_servings": datos.base_servings,
         "time_minutes": (datos.prep_minutes or 0) + (datos.cook_minutes or 0),
         "difficulty": datos.difficulty.value if datos.difficulty else None,
+        "source_url": datos.source_url,
         "ingredients": [
             {"product_id": p.id, "product_name": p.canonical_name, "quantity": cantidad,
              "unit": p.default_unit, "optional": ing.optional, "notes": ing.notes}
@@ -139,7 +141,7 @@ def _escribir_hijos(session: Session, receta: Recipe, datos: RecetaIn, resueltos
 
 def _aplicar(receta: Recipe, datos: RecetaIn) -> None:
     for campo in ("title", "description", "base_servings", "prep_minutes", "cook_minutes",
-                  "difficulty", "instructions"):
+                  "difficulty", "instructions", "source_url"):
         setattr(receta, campo, getattr(datos, campo))
     receta.updated_at = datetime.now(UTC)
 
@@ -224,6 +226,7 @@ def obtener_receta(session: Session, recipe_id: int) -> dict[str, Any]:
         "cook_minutes": receta.cook_minutes,
         "difficulty": receta.difficulty.value if receta.difficulty else None,
         "instructions": receta.instructions,
+        "source_url": receta.source_url,
         "ingredients": [
             {"product_id": i.product_id, "product_name": productos[i.product_id].canonical_name,
              "quantity": i.quantity, "unit": i.unit, "optional": i.optional, "notes": i.notes}

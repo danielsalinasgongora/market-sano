@@ -14,6 +14,7 @@ from sqlmodel import Session
 from app.mcp.db import mcp_engine
 from app.mcp.server import mcp
 from app.services.identidad import SinHogar, owner_implicito
+from app.services.imports import ImportInvalido, importar_desde_url
 from app.services.recipes import (
     NoEncontrada,
     RecetaIn,
@@ -30,6 +31,8 @@ def _accionable(fn: Any) -> Any:
     try:
         return fn()
     except (NoEncontrada, RecetaInvalida, SinHogar) as exc:
+        raise ToolError(str(exc)) from exc
+    except ImportInvalido as exc:
         raise ToolError(str(exc)) from exc
     except ValidationError as exc:
         raise ToolError(f"Receta inválida: {exc.errors(include_url=False)}") from exc
@@ -112,6 +115,29 @@ def get_recipe_cost(
     """
     with Session(mcp_engine()) as session:
         return _accionable(lambda: costo_receta(session, recipe_id, store_id))
+
+
+@mcp.tool
+def import_recipe(
+    url: Annotated[str, "URL de la receta (http/https) con JSON-LD schema.org/Recipe"],
+    dry_run: Annotated[bool, "true (defecto): solo vista previa; false: crea la receta"] = True,
+) -> dict[str, Any]:
+    """Importa una receta desde URL: descarga la página, extrae el JSON-LD y
+    mapea los ingredientes al catálogo por nombre/alias.
+
+    Con dry_run=true devuelve la vista previa sin guardar: muéstrala al usuario.
+    Los ingredientes que no se pueden estructurar **no se pierden**: vuelven en
+    `unresolved` con el motivo y sugerencias del catálogo; la receta se crea con
+    los resueltos. Cada importación real deja un job con estado `completed` o
+    `failed` (misma URL inválida incluida).
+    """
+    with Session(mcp_engine()) as session:
+        def accion() -> dict[str, Any]:
+            hogar, usuario = owner_implicito(session)
+            return importar_desde_url(
+                session, hogar.id, url, dry_run=dry_run, created_by=usuario.id
+            )
+        return _accionable(accion)
 
 
 @mcp.tool
