@@ -20,6 +20,8 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True, max_length=320)
     password_hash: str | None = Field(default=None, max_length=255)
     display_name: str = Field(max_length=120)
+    privacy_consent_at: datetime | None = Field(default=None)
+    privacy_consent_version: str | None = Field(default=None, max_length=32)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

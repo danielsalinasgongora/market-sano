@@ -39,6 +39,7 @@ docker compose up
 - Datos de ejemplo (catálogo chileno + recetas): `docker compose exec -T app python -m app.seed`
 - Perfiles: `--profile standard` añade PostgreSQL 16 · `--profile full` añade MQTT (Home Assistant).
 - Precios en vivo (Jumbo, Santa Isabel, Unimarc): `SUPERMERCADOS_ENABLED=true docker compose up` — ver [docs/connectors](docs/connectors/README.md).
+- Autenticación: por defecto `AUTH_MODE=none` (sin login, owner del hogar por defecto). Para multiusuario local: `AUTH_MODE=local docker compose up` y usa `POST /api/v1/auth/register` (exige aceptar el aviso de privacidad) → Bearer; también `POST /api/v1/auth/login`, `GET /api/v1/auth/me` y `GET /api/v1/auth/privacy`. Sin token, la API de datos responde 401.
 
 > ⚠️ **Estado actual: Fase 2 (núcleo vía API/MCP).** El backend, los precios reales y el recetario con costos ya funcionan; la interfaz web (PWA) llega en la Fase 3. Progreso y hoja de ruta en [`tasks/todo.md`](tasks/todo.md); diseño completo en [`docs/spec.md`](docs/spec.md).
 

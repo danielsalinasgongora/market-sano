@@ -162,12 +162,12 @@
 ### Task 13: Autenticación local multi-usuario (AUTH_MODE dual)
 **Descripción:** Registro local (email + contraseña Argon2id) con **aviso de privacidad y consentimiento afirmativo** (Ley 21.719: checkbox no premarcado); login que emite Bearer (hasheado en `api_tokens`); `AUTH_MODE=none|local` — con `none`, owner implícito del hogar por defecto; endpoint `/api/v1/auth/{register,login,me}`.
 **Criterios de aceptación:**
-- [ ] `AUTH_MODE=none`: sin login, toda la API opera como owner del hogar por defecto
-- [ ] `AUTH_MODE=local`: registro exige consentimiento activo; login devuelve Bearer; contraseñas nunca en claro (Argon2id verificado en test)
-- [ ] Accesos sin token en modo `local` → 401; tests cubren ambos modos
-**Verificación:** `pytest backend/tests -k auth`.
+- [x] `AUTH_MODE=none`: sin login, toda la API opera como owner del hogar por defecto
+- [x] `AUTH_MODE=local`: registro exige consentimiento activo; login devuelve Bearer; contraseñas nunca en claro (Argon2id verificado en test)
+- [x] Accesos sin token en modo `local` → 401; tests cubren ambos modos
+**Verificación:** `pytest backend/tests -k auth` ✔ Verificado 2026-11-19: 6 tests nuevos (79 totales) y `ruff check` limpio. `argon2-cffi` hashea con Argon2id (`$argon2id$…`, nunca se guarda ni devuelve la clave); el Bearer aleatorio se guarda solo como SHA-256 en `api_tokens` (scopes `read`+`write_draft`) y `/me` actualiza `last_used_at`. Registro exige `privacy_consent=true` (si falta o es false → 422) y guarda `privacy_consent_at` + versión del aviso; versión distinta → 422; email duplicado → 409; login incorrecto → 401 con mensaje genérico para no filtrar cuentas. Migración `0003` agrega las columnas de consentimiento. Con `local`, todos los routers de datos exigen Bearer (401 + `WWW-Authenticate`), mientras `/health`, `/api/v1/auth/*` y la raíz siguen públicos; con `none` la dependencia resuelve el owner implícito y permite leer/escribir sin credenciales. E2E en contenedor con `AUTH_MODE=local`: `GET /api/v1/recipes` → 401; registro → hogar 2 con rol owner; `/me` y recetas con el token OK; login emite un segundo token distinto; hash en BD con prefijo `$argon2id$`. Luego se volvió a `AUTH_MODE=none` y `/me` respondió `owner@marketsano.local` role `owner`.
 **Dependencias:** T3. (Paralelizable con T7–T12.) **Tamaño:** M
-**Archivos:** `backend/app/services/auth.py`, `backend/app/api/auth.py`, `backend/tests/test_auth.py`
+**Archivos:** `backend/app/services/auth.py`, `backend/app/api/auth.py`, `backend/app/api/deps.py`, `backend/app/main.py`, `backend/app/models/household.py`, `backend/migrations/versions/0003_consentimiento_privacidad.py`, `backend/tests/test_auth.py`
 
 ### Task 14: Hogares, miembros, roles, invitaciones y supresión
 **Descripción:** CRUD de hogares; al registrarse se crea hogar propio (owner) o se une con código de invitación (alfanumérico, un solo uso, 24 h); roles owner/member/viewer con aplicación real de permisos; `update_household_preferences` MCP (owner/member); borrado de hogar en cascada (derecho de supresión Ley 21.719).

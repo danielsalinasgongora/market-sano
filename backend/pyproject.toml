@@ -25,6 +25,8 @@ dependencies = [
     # Importación de recetas desde URL (Task 12): JSON-LD de sitios de cocina + fetch HTTP
     "recipe-scrapers>=15",
     "httpx>=0.27",
+    # Autenticación local (Task 13): hashes Argon2id para contraseñas
+    "argon2-cffi>=23.1",
 ]
 
 [project.optional-dependencies]
