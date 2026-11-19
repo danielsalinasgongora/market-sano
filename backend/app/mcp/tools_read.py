@@ -71,16 +71,29 @@ def get_household_context(
 def search_recipes(
     query: Annotated[str, "Texto a buscar en título o descripción (vacío: todas)"] = "",
     tags: Annotated[list[str] | None, "La receta debe tener TODAS estas etiquetas (AND)"] = None,
+    max_cost_per_serving: Annotated[
+        float | None, "Costo máximo por porción en CLP (excluye recetas sin precios completos)"
+    ] = None,
+    max_time_minutes: Annotated[int | None, "Tiempo total máximo (preparación + cocción)"] = None,
+    store_id: Annotated[
+        str | None, "Cadena para los costos (jumbo, santaisabel, unimarc); omitir usa la del hogar"
+    ] = None,
+    sort: Annotated[str, "Orden: title (defecto), cost o rating"] = "title",
     max_results: Annotated[int, "Máximo de resultados a devolver"] = 20,
 ) -> list[dict[str, Any]]:
-    """Busca recetas por texto y etiquetas.
+    """Busca recetas con filtros combinables: texto, etiquetas (AND), costo
+    máximo por porción y tiempo total; ordena por título, costo o rating.
 
-    Versión Fase 0 (spec §3.2): los filtros `max_cost_per_serving`,
-    `max_time_minutes` y `only_with_pantry_match` se agregan cuando exista la
-    capa de costos por porción (Task 11 del plan).
+    Cada resultado incluye `cost_per_serving_clp` (calculado con el último
+    precio de cada ingrediente y su PPUM) e `is_complete_cost`. Con
+    `max_cost_per_serving`, las recetas con precios incompletos se excluyen.
+    `only_with_pantry_match` llega en Task 19.
     """
     with Session(mcp_engine()) as session:
-        return buscar_recetas(session, query, tags, max_results)
+        return buscar_recetas(
+            session, query, tags, max_cost_per_serving, max_time_minutes,
+            store_id, sort, max_results,
+        )
 
 
 @mcp.tool

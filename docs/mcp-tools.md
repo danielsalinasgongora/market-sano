@@ -41,15 +41,19 @@ Devuelve la configuración del hogar (spec §3.1).
 
 ### `search_recipes`
 
-Busca recetas por texto y etiquetas (spec §3.2). Versión Fase 0: los filtros `max_cost_per_serving`, `max_time_minutes` y `only_with_pantry_match` se agregan con la capa de costos (Task 11 del plan).
+Busca recetas con filtros combinables (spec §3.2, Task 11). `only_with_pantry_match` se agrega en Task 19.
 
 | Parámetro | Tipo | Notas |
 |---|---|---|
 | `query` | string | Busca en título **y descripción**, insensible a mayúsculas. Vacío: todas |
 | `tags` | list[string] \| null | La receta debe tener **todas** las etiquetas (AND) |
+| `max_cost_per_serving` | float \| null | Costo máximo por porción en CLP. Excluye recetas con precios incompletos (un costo parcial no es comparable) |
+| `max_time_minutes` | int \| null | Tiempo total máximo: `prep_minutes + cook_minutes` |
+| `store_id` | string \| null | Cadena para los costos (`jumbo`, `santaisabel`, `unimarc`). Omitir usa la cadena por defecto del hogar |
+| `sort` | string | `title` (defecto), `cost` (ascendente; sin precio al final) o `rating` (descendente) |
 | `max_results` | int | Por defecto 20 |
 
-**Retorno:** lista de `{recipe_id, title, base_servings, time_minutes, difficulty, tags}`, ordenada alfabéticamente.
+**Retorno:** lista de `{recipe_id, title, base_servings, time_minutes, difficulty, tags, own, avg_rating, rating_count, cost_per_serving_clp, is_complete_cost}`, ordenada según `sort`. El costo usa el último precio de cada ingrediente y su PPUM; `cost_per_serving_clp` es `null` cuando falta el precio de algún ingrediente.
 
 ```json
 [
@@ -59,7 +63,12 @@ Busca recetas por texto y etiquetas (spec §3.2). Versión Fase 0: los filtros `
     "base_servings": 4,
     "time_minutes": 80,
     "difficulty": "media",
-    "tags": ["casera", "chilena", "guiso"]
+    "tags": ["casera", "chilena", "guiso"],
+    "own": false,
+    "avg_rating": 4.5,
+    "rating_count": 2,
+    "cost_per_serving_clp": 2948,
+    "is_complete_cost": true
   }
 ]
 ```
@@ -76,7 +85,7 @@ Estado de la despensa (spec §3.3): cantidades por producto, ubicación e ítems
 
 **Retorno:** lista de `{product_id, product_name, quantity, unit, location, expires_at}` (ISO 8601 o null).
 
-## Tools de recetas (Task 10)
+## Tools de recetas (Task 10–11)
 
 Con `AUTH_MODE=none` el invocador actúa como owner implícito del hogar por defecto. Los permisos por rol y token llegan en T15.
 
@@ -101,6 +110,64 @@ Crea una receta propia del hogar. **Escritura con `dry_run=true` por defecto.**
 ### `rate_recipe`
 
 `recipe_id`, `rating` (1–5) → `{recipe_id, your_rating, rating_avg, rating_count}`. Una calificación por usuario; repetir la reemplaza.
+
+### `scale_recipe`
+
+Escala los ingredientes a `target_servings` con las reglas del Anexo A: unidades discretas (`unidad`) → **ceil** al entero; peso/volumen (`g`, `ml`) → un decimal. **Solo lectura.**
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `recipe_id` | int | |
+| `target_servings` | int | 1 o más |
+
+**Retorno:** `{recipe_id, title, base_servings, target_servings, factor, ingredients[{product_id, product_name, quantity, original_quantity, unit, optional, notes}]}`.
+
+```json
+{
+  "recipe_id": 3,
+  "title": "Empanadas de pino",
+  "base_servings": 12,
+  "target_servings": 5,
+  "factor": 0.4167,
+  "ingredients": [
+    {"product_id": 44, "product_name": "huevo", "quantity": 2,
+     "original_quantity": 3, "unit": "unidad", "optional": false, "notes": null}
+  ]
+}
+```
+
+### `get_recipe_cost`
+
+Costo de una receta con el último precio de cada ingrediente en una cadena (spec §3.2). **Solo lectura.**
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `recipe_id` | int | |
+| `store_id` | string \| null | `jumbo`, `santaisabel` o `unimarc`; omitir usa la cadena del hogar |
+
+**Retorno:** `{recipe_id, title, store_id, base_servings, total_clp, cost_per_serving_clp, is_complete, missing_products, ingredients[{product_id, product_name, quantity, unit, optional, ppum_unit, cost_clp, unit_price_clp, price}]}`. `price` trae la trazabilidad completa (`source`, `source_efectiva`, `confidence`, `confidence_efectiva`, `fetched_at`, `is_stale`, `age_hours`).
+
+Si falta el precio de algún ingrediente, `is_complete=false`, `missing_products` lista los nombres y `warning` explica cómo refrescar; el total cubre solo lo valorizado. El costo se calcula con el **PPUM**: `g → CLP/kg`, `ml → CLP/L`, `unidad → CLP/unidad`.
+
+```json
+{
+  "recipe_id": 1,
+  "title": "Cazuela de vacuno",
+  "store_id": "jumbo",
+  "base_servings": 4,
+  "total_clp": 11792,
+  "cost_per_serving_clp": 2948,
+  "is_complete": true,
+  "missing_products": [],
+  "ingredients": [
+    {
+      "product_id": 12, "product_name": "papa", "quantity": 800.0, "unit": "g",
+      "optional": false, "ppum_unit": "CLP/kg", "cost_clp": 1144,
+      "unit_price_clp": 1430, "price": {"source": "live", "confidence": "high", "is_stale": false}
+    }
+  ]
+}
+```
 
 ## Tools del catálogo abierto (Task 9b)
 
@@ -144,8 +211,7 @@ Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula
 
 | Fase del plan | Agregados |
 |---|---|
-| Task 11 | Filtros de costo/tiempo y `only_with_pantry_match` en `search_recipes` |
-| Task 11 | `scale_recipe`, `get_recipe_cost` |
+| Task 19 | `only_with_pantry_match` en `search_recipes` |
 | Task 14–22 | Planificación, listas, comparación de cadenas y gastos; tokens de confirmación |
 | Task 23 | Transporte HTTP (streamable) + prompts `plan_week_within_budget`, `suggest_meals_from_pantry`, `compare_current_basket` |
 

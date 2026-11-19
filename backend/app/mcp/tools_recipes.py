@@ -19,7 +19,9 @@ from app.services.recipes import (
     RecetaIn,
     RecetaInvalida,
     calificar,
+    costo_receta,
     crear_receta,
+    escalar_receta,
     obtener_receta,
 )
 
@@ -77,6 +79,39 @@ def create_recipe(
             hogar, usuario = owner_implicito(session)
             return crear_receta(session, hogar.id, datos, dry_run=dry_run, created_by=usuario.id)
         return _accionable(accion)
+
+
+@mcp.tool
+def scale_recipe(
+    recipe_id: Annotated[int, "ID de la receta"],
+    target_servings: Annotated[int, "Porciones objetivo (1 o más)"],
+) -> dict[str, Any]:
+    """Escala los ingredientes de una receta a `target_servings`.
+
+    Reglas del Anexo A: unidades discretas (huevo, pan…) se redondean hacia
+    arriba al entero; peso/volumen (g, ml) se mantiene con un decimal.
+    Devuelve cada ingrediente con su cantidad original para comparar.
+    """
+    with Session(mcp_engine()) as session:
+        return _accionable(lambda: escalar_receta(session, recipe_id, target_servings))
+
+
+@mcp.tool
+def get_recipe_cost(
+    recipe_id: Annotated[int, "ID de la receta"],
+    store_id: Annotated[
+        str | None, "Cadena: jumbo, santaisabel o unimarc; omitir usa la del hogar"
+    ] = None,
+) -> dict[str, Any]:
+    """Costo de una receta con el último precio de cada ingrediente.
+
+    Devuelve total, costo por porción y desglose por ingrediente con el PPUM
+    y la trazabilidad del precio (fuente, confianza, fecha, antigüedad).
+    Si falta el precio de algún ingrediente, `is_complete=false` y `warning`
+    explican qué falta; el total cubre solo lo valorizado.
+    """
+    with Session(mcp_engine()) as session:
+        return _accionable(lambda: costo_receta(session, recipe_id, store_id))
 
 
 @mcp.tool

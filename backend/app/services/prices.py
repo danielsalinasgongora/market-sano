@@ -105,29 +105,9 @@ def registrar_precio_manual(
     )
 
 
-def get_latest_price(
-    session: Session,
-    *,
-    product_id: int,
-    store_id: str,
-    ttl_hours: int | None = None,
-) -> PrecioResuelto | None:
-    """Snapshot más reciente del producto en la cadena, con trazabilidad.
-
-    El TTL se usa para marcar `is_stale` y degradar la fuente efectiva de
-    `live` a `cached`. Los precios manuales nunca caducan.
-    """
+def _resolver(snapshot: PriceSnapshot, ttl_hours: int | None) -> PrecioResuelto:
+    """Aplica TTL y degradación live→cached a un snapshot ya elegido."""
     ttl = ttl_hours if ttl_hours is not None else get_settings().price_cache_ttl_hours
-    snapshot = session.exec(
-        select(PriceSnapshot)
-        .where(PriceSnapshot.product_id == product_id)
-        .where(PriceSnapshot.store_id == store_id)
-        .order_by(PriceSnapshot.fetched_at.desc())
-        .limit(1)
-    ).first()
-    if snapshot is None:
-        return None
-
     fetched_at = snapshot.fetched_at
     if fetched_at.tzinfo is None:
         fetched_at = fetched_at.replace(tzinfo=UTC)
@@ -144,3 +124,51 @@ def get_latest_price(
         age_hours=age_hours,
         source_efectiva=source_efectiva,
     )
+
+
+def get_latest_price(
+    session: Session,
+    *,
+    product_id: int,
+    store_id: str,
+    ttl_hours: int | None = None,
+) -> PrecioResuelto | None:
+    """Snapshot más reciente del producto en la cadena, con trazabilidad.
+
+    El TTL se usa para marcar `is_stale` y degradar la fuente efectiva de
+    `live` a `cached`. Los precios manuales nunca caducan.
+    """
+    snapshot = session.exec(
+        select(PriceSnapshot)
+        .where(PriceSnapshot.product_id == product_id)
+        .where(PriceSnapshot.store_id == store_id)
+        .order_by(PriceSnapshot.fetched_at.desc())
+        .limit(1)
+    ).first()
+    if snapshot is None:
+        return None
+    return _resolver(snapshot, ttl_hours)
+
+
+def get_latest_prices(
+    session: Session,
+    *,
+    store_id: str,
+    product_ids: set[int] | None = None,
+    ttl_hours: int | None = None,
+) -> dict[int, PrecioResuelto]:
+    """Último precio por producto en una cadena, en **una** consulta.
+
+    Misma semántica que `get_latest_price` (más reciente gana, TTL y
+    degradación live→cached). Pensado para cálculos masivos: costo de una
+    receta (Task 11) y estimación de planes/listas (Task 16/20).
+    """
+    statement = select(PriceSnapshot).where(PriceSnapshot.store_id == store_id)
+    if product_ids is not None:
+        if not product_ids:
+            return {}
+        statement = statement.where(PriceSnapshot.product_id.in_(product_ids))
+    ultimos: dict[int, PriceSnapshot] = {}
+    for snapshot in session.exec(statement.order_by(PriceSnapshot.fetched_at)).all():
+        ultimos[snapshot.product_id] = snapshot  # orden ascendente: gana el último
+    return {product_id: _resolver(s, ttl_hours) for product_id, s in ultimos.items()}

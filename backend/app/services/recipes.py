@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, delete, func, select
 
 from app.models import (
+    HouseholdPreference,
     ProductCatalog,
     Recipe,
     RecipeCollectionItem,
@@ -22,9 +23,12 @@ from app.models import (
     RecipeRating,
     RecipeStep,
     RecipeTag,
+    StoreConnector,
 )
 from app.models.enums import Difficulty
 from app.services.catalogo_abierto import FACTOR_UNIDAD
+from app.services.prices import PrecioResuelto, get_latest_prices
+from app.services.units import UNIDAD_PPUM, a_clp, costo_en_clp, escalar_cantidad
 
 
 class RecetaInvalida(ValueError):
@@ -255,14 +259,194 @@ def calificar(session: Session, recipe_id: int, user_id: uuid.UUID, rating: int)
             "rating_count": cantidad}
 
 
+def _store_preferido(session: Session, store_id: str | None) -> str:
+    """Cadena para costos: la pedida, la del hogar o la primera registrada."""
+    if store_id:
+        return store_id
+    preferencia = session.exec(
+        select(HouseholdPreference).order_by(HouseholdPreference.household_id)
+    ).first()
+    if preferencia and preferencia.default_store_id:
+        return preferencia.default_store_id
+    conector = session.exec(select(StoreConnector).order_by(StoreConnector.name)).first()
+    return conector.name if conector else "jumbo"
+
+
+def _ingredientes_por_receta(session: Session) -> dict[int, list[RecipeIngredient]]:
+    agrupados: dict[int, list[RecipeIngredient]] = {}
+    for ingrediente in session.exec(
+        select(RecipeIngredient).order_by(RecipeIngredient.sort_order)
+    ).all():
+        agrupados.setdefault(ingrediente.recipe_id, []).append(ingrediente)
+    return agrupados
+
+
+def _total_con_precios(
+    ingredientes: list[RecipeIngredient], precios: dict[int, PrecioResuelto]
+) -> tuple[int, bool]:
+    """(total CLP, completo). `completo=False` si falta el precio de un ingrediente."""
+    total, completo = 0, True
+    for ingrediente in ingredientes:
+        precio = precios.get(ingrediente.product_id)
+        if precio is None:
+            completo = False
+            continue
+        total += a_clp(
+            costo_en_clp(ingrediente.quantity, ingrediente.unit,
+                         precio.snapshot.unit_price_clp)
+        )
+    return total, completo
+
+
+def escalar_receta(session: Session, recipe_id: int, target_servings: int) -> dict[str, Any]:
+    """Escala las cantidades a `target_servings` con las reglas del Anexo A."""
+    if target_servings < 1:
+        raise RecetaInvalida("target_servings debe ser al menos 1.")
+    receta = session.get(Recipe, recipe_id)
+    if receta is None:
+        raise NoEncontrada(f"No existe la receta {recipe_id}.")
+    factor = target_servings / receta.base_servings
+    productos = {p.id: p for p in session.exec(select(ProductCatalog)).all()}
+    ingredientes = session.exec(
+        select(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe_id)
+        .order_by(RecipeIngredient.sort_order)
+    ).all()
+    return {
+        "recipe_id": receta.id,
+        "title": receta.title,
+        "base_servings": receta.base_servings,
+        "target_servings": target_servings,
+        "factor": round(factor, 4),
+        "ingredients": [
+            {
+                "product_id": ing.product_id,
+                "product_name": productos[ing.product_id].canonical_name,
+                "quantity": escalar_cantidad(ing.quantity, ing.unit, factor),
+                "original_quantity": ing.quantity,
+                "unit": ing.unit,
+                "optional": ing.optional,
+                "notes": ing.notes,
+            }
+            for ing in ingredientes
+        ],
+    }
+
+
+def costo_receta(
+    session: Session, recipe_id: int, store_id: str | None = None
+) -> dict[str, Any]:
+    """Costo total y por porción con el último precio de cada ingrediente.
+
+    Cada línea expone el PPUM usado y la trazabilidad completa del snapshot
+    (`source`, `source_efectiva`, `confidence`, `fetched_at`, `is_stale`).
+    Si a un ingrediente le falta precio, el total cubre solo lo que se pudo
+    valorizar y la respuesta lo declara con `is_complete=false` + `warning`.
+    """
+    receta = session.get(Recipe, recipe_id)
+    if receta is None:
+        raise NoEncontrada(f"No existe la receta {recipe_id}.")
+    cadena = _store_preferido(session, store_id)
+    productos = {p.id: p for p in session.exec(select(ProductCatalog)).all()}
+    ingredientes = session.exec(
+        select(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe_id)
+        .order_by(RecipeIngredient.sort_order)
+    ).all()
+    precios = get_latest_prices(
+        session, store_id=cadena, product_ids={i.product_id for i in ingredientes}
+    )
+
+    lineas: list[dict[str, Any]] = []
+    faltantes: list[str] = []
+    total = 0
+    for ing in ingredientes:
+        producto = productos[ing.product_id]
+        precio = precios.get(ing.product_id)
+        linea: dict[str, Any] = {
+            "product_id": ing.product_id,
+            "product_name": producto.canonical_name,
+            "quantity": ing.quantity,
+            "unit": ing.unit,
+            "optional": ing.optional,
+            "ppum_unit": UNIDAD_PPUM.get(ing.unit),
+        }
+        if precio is None:
+            faltantes.append(producto.canonical_name)
+            linea.update({"cost_clp": None, "unit_price_clp": None, "price": None})
+        else:
+            costo = a_clp(
+                costo_en_clp(ing.quantity, ing.unit, precio.snapshot.unit_price_clp)
+            )
+            total += costo
+            linea.update(
+                {
+                    "cost_clp": costo,
+                    "unit_price_clp": precio.snapshot.unit_price_clp,
+                    "price": precio.a_dict(),
+                }
+            )
+        lineas.append(linea)
+
+    respuesta: dict[str, Any] = {
+        "recipe_id": receta.id,
+        "title": receta.title,
+        "store_id": cadena,
+        "base_servings": receta.base_servings,
+        "total_clp": total,
+        "cost_per_serving_clp": a_clp(total / receta.base_servings),
+        "is_complete": not faltantes,
+        "missing_products": faltantes,
+        "ingredients": lineas,
+    }
+    if faltantes:
+        respuesta["warning"] = (
+            f"Sin precio en {cadena} para: {', '.join(faltantes)}. El total cubre solo "
+            "los ingredientes con precio; consulta el precio del producto para refrescarlo "
+            "con el conector o registra uno manual."
+        )
+    return respuesta
+
+
 def buscar_recetas(
-    session: Session, query: str = "", tags: list[str] | None = None, max_results: int = 20
+    session: Session,
+    query: str = "",
+    tags: list[str] | None = None,
+    max_cost_per_serving: float | None = None,
+    max_time_minutes: int | None = None,
+    store_id: str | None = None,
+    sort: str = "title",
+    max_results: int = 20,
 ) -> list[dict[str, Any]]:
-    """Búsqueda por texto (título/descripción) y etiquetas AND (filtros de costo: T11)."""
+    """Búsqueda combinable (spec §3.2): texto, tags AND, costo por porción y
+    tiempo total; orden por título (defecto), costo o rating.
+
+    El costo usa el último precio de cada ingrediente en `store_id` (defecto:
+    la cadena del hogar) con su PPUM. Con `max_cost_per_serving` se excluyen
+    las recetas con precios incompletos: un costo parcial no es comparable.
+    (`only_with_pantry_match` se agrega en Task 19.)
+    """
+    if sort not in ("title", "cost", "rating"):
+        raise RecetaInvalida("sort debe ser 'title', 'cost' o 'rating'.")
+    if max_cost_per_serving is not None and max_cost_per_serving < 0:
+        raise RecetaInvalida("max_cost_per_serving no puede ser negativo.")
+
     recetas = session.exec(select(Recipe)).all()
     etiquetas: dict[int, set[str]] = {}
     for fila in session.exec(select(RecipeTag)).all():
         etiquetas.setdefault(fila.recipe_id, set()).add(fila.tag)
+    calificaciones: dict[int, tuple[float | None, int]] = {}
+    for recipe_id, promedio, cantidad in session.exec(
+        select(RecipeRating.recipe_id, func.avg(RecipeRating.rating), func.count())
+        .group_by(RecipeRating.recipe_id)
+    ).all():
+        calificaciones[recipe_id] = (round(promedio, 2), cantidad)
+
+    por_receta = _ingredientes_por_receta(session)
+    precios = get_latest_prices(
+        session,
+        store_id=_store_preferido(session, store_id),
+        product_ids={i.product_id for lista in por_receta.values() for i in lista},
+    )
+
     texto = query.strip().lower()
     requeridas = {t.strip().lower() for t in tags or []}
     resultado = []
@@ -273,14 +457,37 @@ def buscar_recetas(
             continue
         if not requeridas <= etiquetas.get(receta.id, set()):
             continue
+        tiempo = (receta.prep_minutes or 0) + (receta.cook_minutes or 0)
+        if max_time_minutes is not None and tiempo > max_time_minutes:
+            continue
+        total, completo = _total_con_precios(por_receta.get(receta.id, []), precios)
+        costo_porcion = a_clp(total / receta.base_servings) if completo else None
+        if max_cost_per_serving is not None and (
+            costo_porcion is None or costo_porcion > max_cost_per_serving
+        ):
+            continue
+        promedio, cantidad = calificaciones.get(receta.id, (None, 0))
         resultado.append({
             "recipe_id": receta.id,
             "title": receta.title,
             "base_servings": receta.base_servings,
-            "time_minutes": (receta.prep_minutes or 0) + (receta.cook_minutes or 0),
+            "time_minutes": tiempo,
             "difficulty": receta.difficulty.value if receta.difficulty else None,
             "tags": sorted(etiquetas.get(receta.id, set())),
             "own": receta.household_id is not None,
+            "avg_rating": promedio,
+            "rating_count": cantidad,
+            "cost_per_serving_clp": costo_porcion,
+            "is_complete_cost": completo,
         })
-    resultado.sort(key=lambda r: r["title"].lower())
+
+    if sort == "cost":
+        resultado.sort(key=lambda r: (r["cost_per_serving_clp"] is None,
+                                      r["cost_per_serving_clp"] or 0,
+                                      r["title"].lower()))
+    elif sort == "rating":
+        resultado.sort(key=lambda r: (-(r["avg_rating"] or 0), -r["rating_count"],
+                                      r["title"].lower()))
+    else:
+        resultado.sort(key=lambda r: r["title"].lower())
     return resultado[:max_results]
