@@ -418,6 +418,7 @@ def buscar_recetas(
     store_id: str | None = None,
     sort: str = "title",
     max_results: int = 20,
+    household_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """Búsqueda combinable (spec §3.2): texto, tags AND, costo por porción y
     tiempo total; orden por título (defecto), costo o rating.
@@ -454,6 +455,8 @@ def buscar_recetas(
     requeridas = {t.strip().lower() for t in tags or []}
     resultado = []
     for receta in recetas:
+        if household_id is not None and receta.household_id not in (None, household_id):
+            continue
         if texto and texto not in receta.title.lower() and texto not in (
             receta.description or ""
         ).lower():

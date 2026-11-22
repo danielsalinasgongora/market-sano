@@ -6,7 +6,7 @@ Producción: `uvicorn app.main:app`. Tests: `create_app(settings)`.
 
 from fastapi import Depends, FastAPI
 
-from app.api import auth, deps, health, prices, products, recipes
+from app.api import auth, deps, health, households, prices, products, recipes
 from app.db import get_engine
 from app.settings import Settings, get_settings
 
@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(prices.router, dependencies=[Depends(deps.usuario_actual)])
     app.include_router(products.router, dependencies=[Depends(deps.usuario_actual)])
     app.include_router(recipes.router, dependencies=[Depends(deps.usuario_actual)])
+    app.include_router(households.router, dependencies=[Depends(deps.usuario_actual)])
 
     @app.get("/", tags=["salud"])
     def root() -> dict[str, str]:

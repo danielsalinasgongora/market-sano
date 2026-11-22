@@ -172,10 +172,10 @@
 ### Task 14: Hogares, miembros, roles, invitaciones y supresión
 **Descripción:** CRUD de hogares; al registrarse se crea hogar propio (owner) o se une con código de invitación (alfanumérico, un solo uso, 24 h); roles owner/member/viewer con aplicación real de permisos; `update_household_preferences` MCP (owner/member); borrado de hogar en cascada (derecho de supresión Ley 21.719).
 **Criterios de aceptación:**
-- [ ] Registro → hogar propio con rol owner; unirse con código válido → member; código inválido/expirado/consumido rechazado con error específico
-- [ ] viewer no puede escribir preferencias ni recetas; member sí; owner todo (tests por rol)
-- [ ] `DELETE /households/{id}` elimina hogar y todos sus datos asociados (recetas, planes, listas, gastos) — test de cascada
-**Verificación:** `pytest backend/tests -k households`.
+- [x] Registro → hogar propio con rol owner; unirse con código válido → member; código inválido/expirado/consumido rechazado con error específico
+- [x] viewer no puede escribir preferencias ni recetas; member sí; owner todo (tests por rol)
+- [x] `DELETE /households/{id}` elimina hogar y todos sus datos asociados (recetas, planes, listas, gastos) — test de cascada
+**Verificación:** `pytest backend/tests -k households` ✔ Verificado 2026-11-22: 4 tests nuevos (83 totales) y `ruff check` limpio. `app/services/households.py` aplica roles (owner/member escriben, viewer solo lee) con 404 para hogares ajenos y 403 cuando el rol no alcanza; las invitaciones son códigos alfanuméricos de 10 caracteres, un solo uso y 24 h (1–168 configurable), y distinguen inválido/expirado/consumido. `obtener_receta`, escalado, costo y búsqueda ahora se limitan al hogar activo (`X-Household-Id` en modo `local`) más las recetas públicas (`household_id IS NULL`); un viewer recibe 403 en altas/ediciones/calificaciones e invitaciones. El borrado del hogar elimina explícitamente hijos sin `ON DELETE CASCADE` en orden de dependencias (listas→planes, recetas→ingredientes/pasos/tags/ratings/colecciones, despensa→movimientos, gastos→ítems, jobs, invitaciones, preferencias, miembros) y conserva catálogo, precios y recetas públicas. MCP suma `get_household_preferences` y `update_household_preferences`. E2E en contenedor con `AUTH_MODE=local`: registro → hogar owner, invitación/unión → member, reuso/inválido → 422; con rol viewer en BD, preferencias/recetas/invitaciones/borrado → 403; member escribe (200/201) pero no borra (403); owner borra (204) y deja 0 hogares/miembros/recetas privadas, con las 14 recetas públicas intactas.
 **Dependencias:** T13. (Paralelizable con T7–T12.) **Tamaño:** M
 **Archivos:** `backend/app/services/households.py`, `backend/app/api/households.py`, `backend/app/mcp/tools_household.py`, `backend/tests/test_households.py`
 

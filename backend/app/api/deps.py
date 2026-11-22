@@ -8,8 +8,15 @@ from sqlmodel import Session
 
 from app.db import get_session
 from app.models import User
+from app.models.enums import Role
 from app.services.auth import NoAutenticado, autenticar
-from app.services.identidad import owner_implicito
+from app.services.households import (
+    ROLES_ESCRITURA,
+    ContextoHogar,
+    HogarNoEncontrado,
+    contexto_usuario,
+)
+from app.services.identidad import hogar_por_defecto, owner_implicito
 from app.settings import Settings
 
 
@@ -38,3 +45,46 @@ def usuario_actual(
             detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+
+def contexto(
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(settings_de_app)],
+    usuario: Annotated[User, Depends(usuario_actual)],
+) -> ContextoHogar:
+    """Hogar activo y rol del usuario.
+
+    En `AUTH_MODE=none` es el hogar por defecto con rol owner. En `local`
+    respeta `X-Household-Id` (si se envía) o usa el primer hogar del usuario.
+    """
+    if settings.auth_mode == "none":
+        return ContextoHogar(hogar_por_defecto(session), usuario, Role.owner)
+    cabecera = request.headers.get("X-Household-Id")
+    household_id = None
+    if cabecera:
+        try:
+            household_id = int(cabecera)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail="X-Household-Id debe ser un número entero."
+            ) from exc
+    try:
+        return contexto_usuario(session, usuario, household_id)
+    except HogarNoEncontrado as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def requiere_escritura(
+    ctx: Annotated[ContextoHogar, Depends(contexto)],
+) -> ContextoHogar:
+    """403 si el rol es `viewer`; owner y member pueden escribir."""
+    if ctx.rol not in ROLES_ESCRITURA:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Tu rol '{ctx.rol.value}' es de solo lectura; esta operación requiere "
+                "owner o member."
+            ),
+        )
+    return ctx

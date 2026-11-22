@@ -207,6 +207,43 @@ Si falta el precio de algún ingrediente, `is_complete=false`, `missing_products
 }
 ```
 
+## Tools de hogar (Task 14)
+
+Preferencias compartidas del hogar. Escribir requiere rol `owner` o `member`;
+un `viewer` recibe un error accionable. Con `AUTH_MODE=none` el invocador actúa
+como owner implícito del hogar por defecto.
+
+### `get_household_preferences`
+
+Sin parámetros. **Solo lectura.** Devuelve `{household_id, default_store_id,
+dietary_restrictions, allergies, never_buy, comuna}`.
+
+### `update_household_preferences`
+
+Actualiza solo los campos enviados y devuelve las preferencias completas.
+
+| Parámetro | Tipo | Notas |
+|---|---|---|
+| `default_store_id` | string \| null | `jumbo`, `santaisabel` o `unimarc` |
+| `dietary_restrictions` | list[string] \| null | Ej. `["vegetariana", "sin gluten"]` |
+| `allergies` | list[string] \| null | Ej. `["maní", "mariscos"]` |
+| `never_buy` | list[string] \| null | Productos que nunca se compran |
+| `comuna` | string \| null | Comuna para disponibilidad de precios |
+
+```json
+{
+  "household_id": 1,
+  "default_store_id": "jumbo",
+  "dietary_restrictions": ["vegetariana"],
+  "allergies": [],
+  "never_buy": ["bebida"],
+  "comuna": "Ñuñoa"
+}
+```
+
+**Errores accionables:** sin campos para actualizar; campo desconocido; rol
+`viewer` (solo lectura); usuario sin hogar.
+
 ## Tools del catálogo abierto (Task 9b)
 
 Requieren el conector de supermercados (`SUPERMERCADOS_ENABLED=true`, ver [docs/connectors](connectors/README.md)). Sin él, `search_store_products` responde con un error accionable.
@@ -250,7 +287,7 @@ Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula
 | Fase del plan | Agregados |
 |---|---|
 | Task 19 | `only_with_pantry_match` en `search_recipes` |
-| Task 14–22 | Planificación, listas, comparación de cadenas y gastos; tokens de confirmación |
+| Task 15–22 | Planificación, listas, comparación de cadenas y gastos; tokens de confirmación |
 | Task 23 | Transporte HTTP (streamable) + prompts `plan_week_within_budget`, `suggest_meals_from_pantry`, `compare_current_basket` |
 
 ## Verificación

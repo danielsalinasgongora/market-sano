@@ -11,7 +11,12 @@ docs/clients/claude-desktop.md, y el contrato de cada tool en
 docs/mcp-tools.md.
 """
 
-from app.mcp import tools_catalog, tools_read, tools_recipes  # noqa: F401 - registra tools
+from app.mcp import (  # noqa: F401 - registra tools
+    tools_catalog,
+    tools_household,
+    tools_read,
+    tools_recipes,
+)
 from app.mcp.server import mcp
 
 
