@@ -14,6 +14,7 @@ docs/mcp-tools.md.
 from app.mcp import (  # noqa: F401 - registra tools
     tools_catalog,
     tools_household,
+    tools_plans,
     tools_read,
     tools_recipes,
 )

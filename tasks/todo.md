@@ -192,10 +192,10 @@
 ### Task 16: Planificador: draft + entradas + estimación por cadena
 **Descripción:** `meal_plans` (unique hogar+semana), `set_meal_plan_entry` (slots desayuno/almuerzo/cena/snack, `servings_multiplier`), `estimate_meal_plan_cost(plan_id, store_ids[])` agregando en unidad canónica vía PriceService, guardando `budget_snapshots`; `get_budget_status`.
 **Criterios de aceptación:**
-- [ ] Crear plan draft y agregar entradas; una semana → un plan (unique verificado)
-- [ ] Estimación devuelve total por cadena + desglose, y persiste snapshot con `fetched_at`
-- [ ] `get_budget_status` expone `budget_clp`, `estimated_clp`, `variance_clp`
-**Verificación:** `pytest backend/tests -k meal_plan`.
+- [x] Crear plan draft y agregar entradas; una semana → un plan (unique verificado)
+- [x] Estimación devuelve total por cadena + desglose, y persiste snapshot con `fetched_at`
+- [x] `get_budget_status` expone `budget_clp`, `estimated_clp`, `variance_clp`
+**Verificación:** `pytest backend/tests -k meal_plan` ✔ Verificado 2026-11-24: 5 tests nuevos (92 totales) y `ruff check` limpio. `app/services/planner.py` normaliza `week_start` al lunes (un plan por hogar y semana, `uq_meal_plans_household_week` verificado), hace upsert por día+slot (4 slots, `servings_multiplier`, noche libre con `estimated_cost_clp`), valida que la fecha caiga en la semana y congela planes no-draft. `estimate_meal_plan_cost` valoriza cada receta con `costo_receta` (último precio por cadena, PPUM) y persiste un `BudgetSnapshot` por cadena con desglose por entrada, `is_complete`/`missing_products` y `fetched_at`; `get_budget_status` reutiliza el último snapshot (lo calcula si falta) y expone `budget_clp`, `estimated_clp`, `variance_clp` (negativo = excedido), `usage_pct` y `budget_status` (`ok|near|over`). API `/api/v1/plans` (crear/listar/obtener, upsert y borrado de entradas, `estimate`, `budget`) y tools MCP `get_meal_plan`, `list_meal_plans`, `create_meal_plan` (dry_run), `set_meal_plan_entry`, `delete_meal_plan_entry`, `estimate_meal_plan_cost` y `get_budget_status` con scopes read/write_draft. Tests: unicidad y upsert, snapshots por dos cadenas, presupuesto excedido y tools MCP con rechazo de viewer (sin `write_draft`). E2E en contenedor `market-sano-app:t16` (`AUTH_MODE=local`) con precios manuales sembrados vía API: plan pedido para el miércoles se normalizó a 2026-11-23..29, entrada de receta ×2 y noche libre $3.000 → estimación Jumbo $21.410 completa, snapshot 1 con `fetched_at`, presupuesto $50.000 con varianza $28.590 (42,8 %, `ok`) y plan duplicado → 422.
 **Dependencias:** T7, T9, T11. **Tamaño:** M
 **Archivos:** `backend/app/services/planner.py`, `backend/app/api/plans.py`, `backend/app/mcp/tools_plans.py`
 

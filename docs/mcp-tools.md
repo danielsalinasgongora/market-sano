@@ -276,6 +276,45 @@ Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula
 
 **Errores accionables:** `unit` inválida; vincular un producto cuya unidad no es comparable (p. ej. `leche` en ml con un resultado por kg).
 
+## Tools del planificador (Task 16)
+
+Plan semanal draft con un plan por hogar y semana (`week_start` se normaliza al
+lunes). El costo se valoriza con el último precio de cada ingrediente en la
+cadena y se multiplica por `servings_multiplier`; la noche libre
+(`recipe_id=null`) descuenta su `estimated_cost_clp`.
+
+| Tool | Scope | Qué hace |
+|---|---|---|
+| `get_meal_plan` | read | Plan con semana, presupuesto, estado y entradas |
+| `list_meal_plans` | read | Planes del hogar (filtro opcional por semana) |
+| `get_budget_status` | read | `budget_clp`, `estimated_clp`, `variance_clp`, uso y faltantes |
+| `create_meal_plan` | write_draft | Crea el plan draft (`dry_run=true` por defecto) |
+| `set_meal_plan_entry` | write_draft | Upsert de día+slot (receta o noche libre) |
+| `delete_meal_plan_entry` | write_draft | Quita una entrada del plan draft |
+| `estimate_meal_plan_cost` | write_draft | Costo por cadena + snapshot histórico |
+
+`set_meal_plan_entry`:
+
+```json
+{
+  "plan_id": 1,
+  "date": "2026-11-23",
+  "meal_slot": "almuerzo",
+  "recipe_id": 12,
+  "servings_multiplier": 1.0
+}
+```
+
+Noche libre: omite `recipe_id` y envía `label` + `estimated_cost_clp` (p. ej.
+`{"label": "Noche libre: sobras", "estimated_cost_clp": 3000}`). Un plan
+`confirmed` o `archived` rechaza cambios.
+
+`estimate_meal_plan_cost` devuelve por cadena el total, el desglose por entrada
+y `is_complete`/`missing_products`, y persiste un `BudgetSnapshot` con
+`fetched_at`. `get_budget_status` usa el último snapshot de la cadena
+(lo calcula si no existe): `variance_clp` = presupuesto − estimado (negativo =
+excedido) y `budget_status` ∈ `ok | near | over`.
+
 ## Resource
 
 | URI | Descripción |
@@ -299,8 +338,8 @@ rol del usuario (T14):
 
 | Scope | Tools |
 |---|---|
-| `read` | `get_household_context`, `get_household_preferences`, `search_recipes`, `get_recipe`, `scale_recipe`, `recipe_cost`, `search_store_products`, `get_pantry`, `get_meal_plan` |
-| `write_draft` | `create_recipe`, `import_recipe_from_url`, `rate_recipe`, `update_household_preferences`, `add_product_from_store` |
+| `read` | `get_household_context`, `get_household_preferences`, `search_recipes`, `get_recipe`, `scale_recipe`, `recipe_cost`, `search_store_products`, `get_pantry`, `get_meal_plan`, `list_meal_plans`, `get_budget_status` |
+| `write_draft` | `create_recipe`, `import_recipe_from_url`, `rate_recipe`, `update_household_preferences`, `add_product_from_store`, `create_meal_plan`, `set_meal_plan_entry`, `delete_meal_plan_entry`, `estimate_meal_plan_cost` |
 | `confirm` | `confirm_meal_plan` (Fase 2, T16–T17) |
 | `admin` | reservado (gestión de hogar/invitaciones vía API) |
 
@@ -331,7 +370,8 @@ Revocar un token lo invalida de inmediato (`401`).
 | Fase del plan | Agregados |
 |---|---|
 | Task 19 | `only_with_pantry_match` en `search_recipes` |
-| Task 15–22 | Planificación, listas, comparación de cadenas y gastos; tokens de confirmación |
+| Task 17–18 | Presupuesto estricto, confirmación con token y noche libre; intercambio de comidas |
+| Task 15–22 | Listas, comparación de cadenas y gastos |
 | Task 23 | Transporte HTTP (streamable) + prompts `plan_week_within_budget`, `suggest_meals_from_pantry`, `compare_current_basket` |
 
 ## Verificación
