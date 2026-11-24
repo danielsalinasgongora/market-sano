@@ -12,7 +12,7 @@ Reglas:
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlmodel import Session, select
@@ -383,3 +383,238 @@ def estado_presupuesto(
         "snapshot_id": snapshot.id,
         "estimated_at": snapshot.fetched_at.isoformat(),
     }
+
+
+FREE_NIGHT_LABEL = "Noche libre: sobras o comida para llevar"
+FREE_NIGHT_COST_CLP = 3_000
+VARIETY_WEEKS = 4
+
+
+def _clp(monto: int) -> str:
+    """CLP con separador de miles chileno ($45.000)."""
+    return "$" + f"{monto:,}".replace(",", ".")
+
+
+class PresupuestoInsuficiente(PlanInvalido):
+    """El presupuesto no alcanza para el plan mínimo con variedad."""
+
+    def __init__(self, mensaje: str, *, minimo_clp: int, presupuesto_clp: int) -> None:
+        super().__init__(mensaje)
+        self.minimo_clp = minimo_clp
+        self.presupuesto_clp = presupuesto_clp
+
+
+def _recetas_recientes(
+    session: Session, household_id: int, lunes: date, variacion_semanas: int
+) -> set[int]:
+    """Recetas usadas en las `variacion_semanas` anteriores al lunes dado."""
+    desde = lunes - timedelta(weeks=max(0, variacion_semanas))
+    filas = session.exec(
+        select(MealPlanEntry.recipe_id)
+        .join(MealPlan, MealPlanEntry.plan_id == MealPlan.id)
+        .where(
+            MealPlan.household_id == household_id,
+            MealPlan.week_start >= desde,
+            MealPlan.week_start < lunes,
+            MealPlanEntry.recipe_id.is_not(None),
+        )
+    ).all()
+    return {recipe_id for recipe_id in filas if recipe_id is not None}
+
+
+def _candidatas(
+    session: Session,
+    household_id: int,
+    lunes: date,
+    cadena: str,
+    variacion_semanas: int,
+) -> list[dict[str, Any]]:
+    """Recetas visibles, sin precios incompletos y fuera de la ventana de variedad."""
+    excluidas = _recetas_recientes(session, household_id, lunes, variacion_semanas)
+    candidatas: list[dict[str, Any]] = []
+    for receta in session.exec(select(Recipe).order_by(Recipe.id)).all():
+        if receta.household_id not in (None, household_id):
+            continue
+        if receta.id in excluidas:
+            continue
+        detalle = costo_receta(session, receta.id, cadena)
+        if not detalle["is_complete"] or detalle["total_clp"] <= 0:
+            continue
+        candidatas.append({
+            "recipe_id": receta.id,
+            "recipe_title": receta.title,
+            "cost_clp": detalle["total_clp"],
+        })
+    candidatas.sort(key=lambda c: (c["cost_clp"], c["recipe_title"].lower()))
+    return candidatas
+
+
+def sugerir_plan(
+    session: Session,
+    household_id: int,
+    *,
+    week_start: date,
+    budget_clp: int,
+    store_id: str | None = None,
+    variety_weeks: int = VARIETY_WEEKS,
+    free_nights: int = 1,
+    free_night_cost_clp: int = FREE_NIGHT_COST_CLP,
+    dry_run: bool = True,
+    created_by: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Arma un plan draft de 7 cenas dentro del presupuesto y con variedad.
+
+    Elige las recetas más baratas con precio completo que no se hayan usado en
+    las últimas `variety_weeks` semanas; las últimas `free_nights` cenas se
+    reservan como noche libre con `free_night_cost_clp` explícito. Si el
+    presupuesto no alcanza para el mínimo, lanza `PresupuestoInsuficiente` con
+    `minimo_clp` y `presupuesto_clp`.
+    """
+    if budget_clp <= 0:
+        raise PlanInvalido("budget_clp debe ser mayor que 0.")
+    if not 0 <= free_nights <= 6:
+        raise PlanInvalido("free_nights debe estar entre 0 y 6.")
+    if free_night_cost_clp < 0:
+        raise PlanInvalido("free_night_cost_clp no puede ser negativo.")
+    if variety_weeks < 0:
+        raise PlanInvalido("variety_weeks no puede ser negativo.")
+
+    lunes = normalizar_semana(week_start)
+    if session.exec(
+        select(MealPlan).where(
+            MealPlan.household_id == household_id, MealPlan.week_start == lunes
+        )
+    ).first():
+        raise PlanInvalido(
+            f"Ya existe un plan para la semana del {lunes.isoformat()}. "
+            "Archívalo o edítalo antes de sugerir otro."
+        )
+
+    cadena = (store_id or "").strip() or _cadenas_por_defecto(session, household_id)[0]
+    necesarias = 7 - free_nights
+    candidatas = _candidatas(session, household_id, lunes, cadena, variety_weeks)
+    if len(candidatas) < necesarias:
+        raise PlanInvalido(
+            f"La variedad de {variety_weeks} semanas deja {len(candidatas)} recetas "
+            f"con precio completo en {cadena} y se necesitan {necesarias}. Agrega "
+            "recetas, precios o reduce la ventana de variedad."
+        )
+    elegidas = candidatas[:necesarias]
+    total = sum(c["cost_clp"] for c in elegidas) + free_nights * free_night_cost_clp
+    if total > budget_clp:
+        raise PresupuestoInsuficiente(
+            f"El plan mínimo con variedad cuesta {_clp(total)} y el presupuesto es "
+            f"{_clp(budget_clp)} (faltan {_clp(total - budget_clp)}). Sube el "
+            "presupuesto, reduce las noches libres o registra precios más baratos.",
+            minimo_clp=total,
+            presupuesto_clp=budget_clp,
+        )
+
+    entradas: list[dict[str, Any]] = []
+    indice = 0
+    for dia in range(7):
+        fecha = lunes + timedelta(days=dia)
+        if dia >= 7 - free_nights:
+            entradas.append({
+                "date": fecha.isoformat(),
+                "meal_slot": "cena",
+                "recipe_id": None,
+                "recipe_title": None,
+                "label": FREE_NIGHT_LABEL,
+                "estimated_cost_clp": free_night_cost_clp,
+                "cost_clp": free_night_cost_clp,
+            })
+            continue
+        receta = elegidas[indice]
+        indice += 1
+        entradas.append({
+            "date": fecha.isoformat(),
+            "meal_slot": "cena",
+            "recipe_id": receta["recipe_id"],
+            "recipe_title": receta["recipe_title"],
+            "label": None,
+            "estimated_cost_clp": None,
+            "cost_clp": receta["cost_clp"],
+        })
+
+    resumen = {
+        "dry_run": dry_run,
+        "week_start": lunes.isoformat(),
+        "week_end": (lunes + timedelta(days=6)).isoformat(),
+        "budget_clp": budget_clp,
+        "estimated_clp": total,
+        "variance_clp": budget_clp - total,
+        "store_id": cadena,
+        "variety_weeks": variety_weeks,
+        "free_nights": free_nights,
+        "free_night_cost_clp": free_night_cost_clp,
+        "entries": entradas,
+    }
+    if dry_run:
+        return {"plan_id": None, **resumen}
+
+    plan = MealPlan(
+        household_id=household_id,
+        week_start=lunes,
+        budget_clp=budget_clp,
+        created_by=created_by,
+    )
+    session.add(plan)
+    session.flush()
+    for entrada in entradas:
+        session.add(
+            MealPlanEntry(
+                plan_id=plan.id,
+                date=date.fromisoformat(entrada["date"]),
+                meal_slot=MealSlot.cena,
+                recipe_id=entrada["recipe_id"],
+                label=entrada["label"],
+                estimated_cost_clp=entrada["estimated_cost_clp"],
+                sort_order=_SLOT_ORDEN[MealSlot.cena],
+            )
+        )
+    session.commit()
+    session.refresh(plan)
+    return {"plan_id": plan.id, **resumen, "status": plan.status.value}
+
+
+def confirmar_plan(
+    session: Session, household_id: int, plan_id: int
+) -> dict[str, Any]:
+    """Confirma un plan draft: exige entradas, precios completos y estar dentro
+    del presupuesto. Una vez confirmado queda congelado para ediciones."""
+    plan = _plan_del_hogar(session, plan_id, household_id)
+    if plan.status is PlanStatus.confirmed:
+        raise PlanInvalido(
+            f"El plan {plan.id} ya está confirmado (desde {plan.confirmed_at})."
+        )
+    if plan.status is not PlanStatus.draft:
+        raise PlanInvalido(
+            f"El plan está {plan.status.value}: solo un draft se puede confirmar."
+        )
+    if not session.exec(
+        select(MealPlanEntry).where(MealPlanEntry.plan_id == plan.id)
+    ).first():
+        raise PlanInvalido("El plan no tiene comidas: agrega entradas antes de confirmarlo.")
+
+    estado = estado_presupuesto(session, household_id, plan.id)
+    if not estado["is_complete"]:
+        faltantes = ", ".join(estado["missing_products"]) or "algunos ingredientes"
+        raise PlanInvalido(
+            f"No se puede confirmar sin precios completos en {estado['store_id']}: "
+            f"faltan {faltantes}. Registra precios manuales o refresca el conector."
+        )
+    if estado["variance_clp"] < 0:
+        raise PlanInvalido(
+            f"El plan excede el presupuesto en {_clp(-estado['variance_clp'])} "
+            f"({_clp(estado['estimated_clp'])} estimado vs "
+            f"{_clp(estado['budget_clp'])}). Ajusta comidas o sube el presupuesto "
+            "antes de confirmar."
+        )
+
+    plan.status = PlanStatus.confirmed
+    plan.confirmed_at = datetime.now(UTC)
+    session.add(plan)
+    session.commit()
+    session.refresh(plan)
+    return {**_plan_dict(session, plan), "budget": estado}

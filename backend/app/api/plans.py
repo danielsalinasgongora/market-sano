@@ -8,17 +8,24 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from app.api.deps import contexto, requiere_escritura
+from app.api.deps import (
+    contexto,
+    requiere_escritura,
+    requiere_scope,
+    settings_de_app,
+)
 from app.db import get_session
 from app.services.households import ContextoHogar
 from app.services.planner import (
     PlanInvalido,
     PlanNoEncontrado,
+    confirmar_plan,
     crear_plan,
     estado_presupuesto,
     estimar_costo_plan,
     listar_planes,
     obtener_plan,
+    sugerir_plan,
 )
 from app.services.planner import (
     definir_entrada as definir_entrada_plan,
@@ -27,6 +34,7 @@ from app.services.planner import (
     eliminar_entrada as eliminar_entrada_plan,
 )
 from app.services.recipes import NoEncontrada
+from app.settings import Settings
 
 router = APIRouter(prefix="/api/v1/plans", tags=["planes"])
 SesionDep = Annotated[Session, Depends(get_session)]
@@ -48,6 +56,16 @@ class EntradaIn(BaseModel):
 
 class EstimacionIn(BaseModel):
     store_ids: list[str] | None = None
+
+
+class SugerenciaIn(BaseModel):
+    week_start: date
+    budget_clp: int = Field(gt=0)
+    store_id: str | None = None
+    variety_weeks: int | None = Field(default=None, ge=0, le=52)
+    free_nights: int = Field(default=1, ge=0, le=6)
+    free_night_cost_clp: int | None = Field(default=None, ge=0)
+    dry_run: bool = True
 
 
 def _errores(fn: Any) -> Any:
@@ -85,6 +103,38 @@ def listar(
 ) -> list[dict[str, Any]]:
     """Planes del hogar, opcionalmente filtrados por semana."""
     return listar_planes(session, ctx.hogar.id, week_start=week_start)
+
+
+@router.post("/suggest")
+def sugerir(
+    datos: SugerenciaIn,
+    session: SesionDep,
+    ctx: Annotated[ContextoHogar, Depends(requiere_escritura)],
+    settings: Annotated[Settings, Depends(settings_de_app)],
+) -> dict[str, Any]:
+    """Sugiere un plan de 7 cenas dentro del presupuesto y con variedad."""
+    return _errores(
+        lambda: sugerir_plan(
+            session,
+            ctx.hogar.id,
+            week_start=datos.week_start,
+            budget_clp=datos.budget_clp,
+            store_id=datos.store_id,
+            variety_weeks=(
+                settings.plan_variety_weeks
+                if datos.variety_weeks is None
+                else datos.variety_weeks
+            ),
+            free_nights=datos.free_nights,
+            free_night_cost_clp=(
+                settings.free_night_cost_clp
+                if datos.free_night_cost_clp is None
+                else datos.free_night_cost_clp
+            ),
+            dry_run=datos.dry_run,
+            created_by=ctx.usuario.id,
+        )
+    )
 
 
 @router.get("/{plan_id}")
@@ -156,3 +206,14 @@ def presupuesto(
     return _errores(
         lambda: estado_presupuesto(session, ctx.hogar.id, plan_id, store_id=store_id)
     )
+
+
+@router.post("/{plan_id}/confirm")
+def confirmar(
+    plan_id: int,
+    session: SesionDep,
+    ctx: Annotated[ContextoHogar, Depends(requiere_escritura)],
+    _scope: Annotated[None, Depends(requiere_scope("confirm"))],
+) -> dict[str, Any]:
+    """Confirma el plan (requiere token con scope `confirm`) y lo congela."""
+    return _errores(lambda: confirmar_plan(session, ctx.hogar.id, plan_id))

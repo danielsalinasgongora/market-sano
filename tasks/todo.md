@@ -202,10 +202,10 @@
 ### Task 17: Presupuesto estricto + confirmación con token + noche libre
 **Descripción:** Sugeridor que arma la semana dentro de `budget_clp` con variedad (sin repetir receta en 4 semanas configurable); `confirm_meal_plan` requiere token (scope `confirm`) → status confirmed + `confirmed_at`; slot "noche libre" (sobras/llevar) contabilizado con monto estimado configurable.
 **Criterios de aceptación:**
-- [ ] Plan sugerido respeta presupuesto con recetas del seed y sin repetir dentro de la ventana
-- [ ] Confirmar sin token → error; con token → confirmed y congela ediciones draft
-- [ ] Noche libre descuenta del presupuesto con monto estimado explícito
-**Verificación:** `pytest backend/tests -k budget_confirm`.
+- [x] Plan sugerido respeta presupuesto con recetas del seed y sin repetir dentro de la ventana
+- [x] Confirmar sin token → error; con token → confirmed y congela ediciones draft
+- [x] Noche libre descuenta del presupuesto con monto estimado explícito
+**Verificación:** `pytest backend/tests -k budget_confirm` ✔ Verificado 2026-11-24: 4 tests nuevos (96 totales) y `ruff check` limpio. `sugerir_plan` elige las 7 cenas más baratas con precio completo (recetas públicas + propias), excluye las usadas en las últimas `PLAN_VARIETY_WEEKS` semanas (4 por defecto) y reserva las últimas `free_nights` cenas como noche libre por `FREE_NIGHT_COST_CLP` (3.000); si el mínimo supera el presupuesto lanza `PresupuestoInsuficiente` con `minimo_clp` y el faltante en el mensaje. Con `dry_run=false` persiste el plan draft con sus entradas y devuelve `estimated_clp`/`variance_clp`. `confirmar_plan` exige draft con comidas, snapshot de precios completo y `variance_clp >= 0`, fija `status=confirmed`+`confirmed_at` y congela entradas; la API añade `requiere_scope("confirm")` (el login solo trae `read`+`write_draft`) y MCP `confirm_meal_plan` usa `exigir_confirmacion`. Tests: variedad entre semanas, presupuesto insuficiente, scope API 403→200 con token `confirm`, edición y reconfirmación 422, plan apretado rechazado y MCP sin/con scope. E2E en contenedor `market-sano-app:t17` (`PLAN_VARIETY_WEEKS=4`, `FREE_NIGHT_COST_CLP=3000`): 34 precios manuales, sugerencia $56.020/$100.000 (6 cenas distintas + 1 noche libre), guardado draft, confirmación sin scope 403, con token `confirm` 200 (`confirmed_at`) y edición posterior 422.
 **Dependencias:** T15, T16. **Tamaño:** M
 **Archivos:** `backend/app/services/planner.py`, `backend/app/mcp/tools_plans.py`, `backend/tests/test_planner.py`
 

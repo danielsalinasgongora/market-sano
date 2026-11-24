@@ -4,7 +4,7 @@ cadena con snapshots y estado del presupuesto."""
 
 import asyncio
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -29,13 +29,17 @@ from app.models import (
 from app.models.enums import Role
 from app.seed import seed
 from app.services.auth import emitir_token, hash_password
+from app.services.identidad import owner_implicito
 from app.services.planner import (
     PlanInvalido,
+    PresupuestoInsuficiente,
+    confirmar_plan,
     crear_plan,
     definir_entrada,
     estado_presupuesto,
     estimar_costo_plan,
     obtener_plan,
+    sugerir_plan,
 )
 from app.services.prices import registrar_precio_manual
 from app.services.recipes import costo_receta
@@ -474,3 +478,230 @@ def test_tools_mcp_del_planificador(
     finally:
         set_mcp_engine(None)
         monkeypatch.delenv("MCP_API_TOKEN", raising=False)
+
+
+def test_budget_sugerencia_variedad_y_noche_libre(engine_sembrado: Engine) -> None:
+    hogar = _hogar(engine_sembrado)
+    enorme = 1_000_000
+    with Session(engine_sembrado) as session:
+        previa = sugerir_plan(
+            session, hogar, week_start=LUNES, budget_clp=enorme, free_nights=1
+        )
+        cenas = [e for e in previa["entries"] if e["recipe_id"] is not None]
+        libres = [e for e in previa["entries"] if e["recipe_id"] is None]
+        assert len(previa["entries"]) == 7
+        assert len(cenas) == 6 and len(libres) == 1
+        assert libres[0]["meal_slot"] == "cena"
+        assert libres[0]["estimated_cost_clp"] == 3_000
+        assert len({e["recipe_id"] for e in cenas}) == 6
+        assert previa["estimated_clp"] == sum(e["cost_clp"] for e in previa["entries"])
+        assert previa["estimated_clp"] <= enorme
+        assert previa["variance_clp"] == enorme - previa["estimated_clp"]
+
+        # La receta más barata usada la semana anterior no puede repetirse.
+        mas_barata = min(cenas, key=lambda e: e["cost_clp"])["recipe_id"]
+        anterior = crear_plan(
+            session,
+            hogar,
+            week_start=LUNES - timedelta(days=7),
+            budget_clp=enorme,
+        )
+        definir_entrada(
+            session,
+            hogar,
+            anterior["plan_id"],
+            fecha=LUNES - timedelta(days=7),
+            meal_slot="cena",
+            recipe_id=mas_barata,
+        )
+        nueva = sugerir_plan(
+            session, hogar, week_start=LUNES, budget_clp=enorme, variety_weeks=4
+        )
+        assert mas_barata not in {e["recipe_id"] for e in nueva["entries"]}
+        sin_variedad = sugerir_plan(
+            session,
+            hogar,
+            week_start=LUNES,
+            budget_clp=enorme,
+            variety_weeks=0,
+        )
+        assert mas_barata in {e["recipe_id"] for e in sin_variedad["entries"]}
+
+        guardado = sugerir_plan(
+            session,
+            hogar,
+            week_start=LUNES,
+            budget_clp=enorme,
+            free_nights=2,
+            free_night_cost_clp=2_500,
+            dry_run=False,
+        )
+        assert guardado["plan_id"] is not None
+        assert guardado["status"] == "draft"
+        plan = obtener_plan(session, hogar, guardado["plan_id"])
+        assert len(plan["entries"]) == 7
+        libres = [e for e in plan["entries"] if e["recipe_id"] is None]
+        assert len(libres) == 2
+        assert all(e["estimated_cost_clp"] == 2_500 for e in libres)
+        assert guardado["estimated_clp"] == sum(
+            e["cost_clp"] for e in guardado["entries"]
+        )
+
+
+def test_budget_sugerencia_presupuesto_insuficiente(engine_sembrado: Engine) -> None:
+    hogar = _hogar(engine_sembrado)
+    with Session(engine_sembrado) as session, pytest.raises(
+        PresupuestoInsuficiente
+    ) as excinfo:
+        sugerir_plan(session, hogar, week_start=LUNES, budget_clp=1, free_nights=1)
+    assert excinfo.value.minimo_clp > 1
+    assert excinfo.value.presupuesto_clp == 1
+    assert "plan mínimo" in str(excinfo.value)
+
+
+def test_budget_confirm_scope_congela_y_rechaza_exceso(
+    api_local: TestClient, engine_sembrado: Engine
+) -> None:
+    registro = api_local.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "confirm@example.cl",
+            "password": PASSWORD,
+            "display_name": "Confirm",
+            "privacy_consent": True,
+        },
+    )
+    assert registro.status_code == 201, registro.text
+    login = registro.json()["token"]
+    enorme = 1_000_000
+
+    sugerido = api_local.post(
+        "/api/v1/plans/suggest",
+        headers=_bearer(login),
+        json={
+            "week_start": LUNES.isoformat(),
+            "budget_clp": enorme,
+            "free_nights": 1,
+            "dry_run": False,
+        },
+    )
+    assert sugerido.status_code == 200, sugerido.text
+    plan_id = sugerido.json()["plan_id"]
+    assert sugerido.json()["estimated_clp"] <= enorme
+
+    sin_scope = api_local.post(
+        f"/api/v1/plans/{plan_id}/confirm", headers=_bearer(login)
+    )
+    assert sin_scope.status_code == 403
+    assert "confirm" in sin_scope.json()["detail"]
+
+    token_confirm = api_local.post(
+        "/api/v1/tokens",
+        headers=_bearer(login),
+        json={"name": "confirmador", "scopes": ["confirm"]},
+    )
+    assert token_confirm.status_code == 201, token_confirm.text
+    headers = _bearer(token_confirm.json()["token"])
+
+    confirmado = api_local.post(f"/api/v1/plans/{plan_id}/confirm", headers=headers)
+    assert confirmado.status_code == 200, confirmado.text
+    datos = confirmado.json()
+    assert datos["status"] == "confirmed"
+    assert datos["confirmed_at"]
+    assert datos["budget"]["variance_clp"] >= 0
+
+    entrada = api_local.put(
+        f"/api/v1/plans/{plan_id}/entries",
+        headers=headers,
+        json={
+            "date": LUNES.isoformat(),
+            "meal_slot": "almuerzo",
+            "recipe_id": 1,
+        },
+    )
+    assert entrada.status_code == 422
+    assert "no admite cambios" in entrada.json()["detail"]
+    assert api_local.post(
+        f"/api/v1/plans/{plan_id}/confirm", headers=headers
+    ).status_code == 422
+
+    with Session(engine_sembrado) as session:
+        usuario = session.exec(
+            select(User).where(User.email == "confirm@example.cl")
+        ).one()
+        membresia = session.exec(
+            select(HouseholdMember).where(HouseholdMember.user_id == usuario.id)
+        ).one()
+        hogar = membresia.household_id
+        apretado = crear_plan(
+            session, hogar, week_start=LUNES + timedelta(days=7), budget_clp=1
+        )
+        [(receta, _)] = _recetas_completas(engine_sembrado, cantidad=1)
+        definir_entrada(
+            session,
+            hogar,
+            apretado["plan_id"],
+            fecha=LUNES + timedelta(days=7),
+            meal_slot="cena",
+            recipe_id=receta,
+        )
+        with pytest.raises(PlanInvalido, match="excede el presupuesto"):
+            confirmar_plan(session, hogar, apretado["plan_id"])
+
+
+def test_budget_confirm_mcp_requiere_scope(
+    engine_sembrado: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hogar = _hogar(engine_sembrado)
+    [(receta, _)] = _recetas_completas(engine_sembrado, cantidad=1)
+    with Session(engine_sembrado) as session:
+        plan = crear_plan(session, hogar, week_start=LUNES, budget_clp=1_000_000)
+        definir_entrada(
+            session,
+            hogar,
+            plan["plan_id"],
+            fecha=LUNES,
+            meal_slot="cena",
+            recipe_id=receta,
+        )
+        _, usuario = owner_implicito(session)
+        sin_confirm = crear_token(
+            session, usuario, name="borrador", scopes=["read", "write_draft"]
+        )["token"]
+        con_confirm = crear_token(
+            session, usuario, name="confirmador", scopes=["read", "confirm"]
+        )["token"]
+
+    set_mcp_engine(engine_sembrado)
+    monkeypatch.setenv("MCP_API_TOKEN", sin_confirm)
+
+    async def rechazo() -> None:
+        async with Client(mcp) as cliente:
+            with pytest.raises(ToolError, match="confirm"):
+                await cliente.call_tool(
+                    "confirm_meal_plan", {"plan_id": plan["plan_id"]}
+                )
+
+    try:
+        asyncio.run(rechazo())
+    finally:
+        set_mcp_engine(None)
+
+    monkeypatch.setenv("MCP_API_TOKEN", con_confirm)
+    set_mcp_engine(engine_sembrado)
+
+    async def confirma() -> dict[str, Any]:
+        async with Client(mcp) as cliente:
+            resultado = await cliente.call_tool(
+                "confirm_meal_plan", {"plan_id": plan["plan_id"]}
+            )
+            return _json(resultado)
+
+    try:
+        datos = asyncio.run(confirma())
+    finally:
+        set_mcp_engine(None)
+        monkeypatch.delenv("MCP_API_TOKEN", raising=False)
+
+    assert datos["status"] == "confirmed"
+    assert datos["confirmed_at"]

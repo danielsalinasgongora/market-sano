@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # ── Capa de precios ───────────────────────────────────────
     price_cache_ttl_hours: int = 12
 
+    # ── Planificador ──────────────────────────────────────────
+    # Ventana de variedad: no repetir una receta en las últimas N semanas.
+    plan_variety_weeks: int = 4
+    # Monto que descuenta cada "noche libre" (sobras o comida para llevar).
+    free_night_cost_clp: int = 3_000
+
 
 def get_settings() -> Settings:
     """Settings frescos por llamada (barato y fácil de sobrescribir en tests)."""

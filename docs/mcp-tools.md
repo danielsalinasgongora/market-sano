@@ -289,9 +289,11 @@ cadena y se multiplica por `servings_multiplier`; la noche libre
 | `list_meal_plans` | read | Planes del hogar (filtro opcional por semana) |
 | `get_budget_status` | read | `budget_clp`, `estimated_clp`, `variance_clp`, uso y faltantes |
 | `create_meal_plan` | write_draft | Crea el plan draft (`dry_run=true` por defecto) |
+| `suggest_meal_plan` | write_draft | 7 cenas dentro del presupuesto con variedad (`dry_run=true` por defecto) |
 | `set_meal_plan_entry` | write_draft | Upsert de día+slot (receta o noche libre) |
 | `delete_meal_plan_entry` | write_draft | Quita una entrada del plan draft |
 | `estimate_meal_plan_cost` | write_draft | Costo por cadena + snapshot histórico |
+| `confirm_meal_plan` | confirm | Confirma y congela el plan (scope `confirm`) |
 
 `set_meal_plan_entry`:
 
@@ -314,6 +316,20 @@ y `is_complete`/`missing_products`, y persiste un `BudgetSnapshot` con
 `fetched_at`. `get_budget_status` usa el último snapshot de la cadena
 (lo calcula si no existe): `variance_clp` = presupuesto − estimado (negativo =
 excedido) y `budget_status` ∈ `ok | near | over`.
+
+**Presupuesto estricto y variedad (Task 17).** `suggest_meal_plan` arma 7 cenas
+con las recetas más baratas de precio completo, sin repetir ninguna usada en
+las últimas `PLAN_VARIETY_WEEKS` semanas (4 por defecto), y reserva las últimas
+`free_nights` cenas como noche libre por `FREE_NIGHT_COST_CLP` (3.000 por
+defecto). Si el presupuesto no alcanza para el mínimo devuelve el monto mínimo
+necesario y cuánto falta. Con `dry_run=false` crea el plan draft con esas
+entradas y `estimated_clp`/`variance_clp`.
+
+**Confirmación.** `confirm_meal_plan` exige un token con scope `confirm` y un
+plan draft con comidas, precios completos y `variance_clp >= 0`; al confirmar
+queda `status=confirmed` + `confirmed_at` y las ediciones de entradas se
+rechazan. En la API es `POST /api/v1/plans/{id}/confirm` con el mismo scope
+(el token de login solo trae `read`+`write_draft`).
 
 ## Resource
 
@@ -339,8 +355,8 @@ rol del usuario (T14):
 | Scope | Tools |
 |---|---|
 | `read` | `get_household_context`, `get_household_preferences`, `search_recipes`, `get_recipe`, `scale_recipe`, `recipe_cost`, `search_store_products`, `get_pantry`, `get_meal_plan`, `list_meal_plans`, `get_budget_status` |
-| `write_draft` | `create_recipe`, `import_recipe_from_url`, `rate_recipe`, `update_household_preferences`, `add_product_from_store`, `create_meal_plan`, `set_meal_plan_entry`, `delete_meal_plan_entry`, `estimate_meal_plan_cost` |
-| `confirm` | `confirm_meal_plan` (Fase 2, T16–T17) |
+| `write_draft` | `create_recipe`, `import_recipe_from_url`, `rate_recipe`, `update_household_preferences`, `add_product_from_store`, `create_meal_plan`, `suggest_meal_plan`, `set_meal_plan_entry`, `delete_meal_plan_entry`, `estimate_meal_plan_cost` |
+| `confirm` | `confirm_meal_plan` |
 | `admin` | reservado (gestión de hogar/invitaciones vía API) |
 
 Sin scope suficiente la tool responde con un `ToolError` accionable que indica
@@ -370,7 +386,7 @@ Revocar un token lo invalida de inmediato (`401`).
 | Fase del plan | Agregados |
 |---|---|
 | Task 19 | `only_with_pantry_match` en `search_recipes` |
-| Task 17–18 | Presupuesto estricto, confirmación con token y noche libre; intercambio de comidas |
+| Task 18 | Intercambio de comidas con reequilibrio automático |
 | Task 15–22 | Listas, comparación de cadenas y gastos |
 | Task 23 | Transporte HTTP (streamable) + prompts `plan_week_within_budget`, `suggest_meals_from_pantry`, `compare_current_basket` |
 
