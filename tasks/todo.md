@@ -182,10 +182,10 @@
 ### Task 15: Tokens de API + scopes + permisos MCP por rol
 **Descripción:** `api_tokens` (hash, scopes `read|write_draft|confirm|admin`, display-once) ligados al usuario autenticado; endpoint + CLI `python -m app.create_token`; mapeo rol→permisos MCP: viewer (lectura), member (draft), owner+token (confirmar/registrar).
 **Criterios de aceptación:**
-- [ ] Token creado vía CLI/endpoint autentica `Authorization: Bearer` y queda hasheado
-- [ ] `confirm_meal_plan` rechazada sin scope `confirm`; tools de lectura aceptan scope `read`
-- [ ] El rol del usuario (T14) se refleja en los permisos MCP de todas las tools
-**Verificación:** `pytest backend/tests -k tokens`; probar reject/accept por scope y rol.
+- [x] Token creado vía CLI/endpoint autentica `Authorization: Bearer` y queda hasheado
+- [x] `confirm_meal_plan` rechazada sin scope `confirm`; tools de lectura aceptan scope `read`
+- [x] El rol del usuario (T14) se refleja en los permisos MCP de todas las tools
+**Verificación:** `pytest backend/tests -k tokens` ✔ Verificado 2026-11-24: 4 tests nuevos (87 totales) y `ruff check` limpio. `app/services/tokens.py` emite `secrets.token_urlsafe(32)` y guarda solo el SHA-256, validando nombre, scopes conocidos y techo por rol (`viewer`→read, `member`→read+write_draft, `owner`→+confirm+admin); `POST/GET/DELETE /api/v1/tokens` y `python -m app.create_token` comparten ese servicio. `app/mcp/permissions.py` resuelve la identidad MCP desde `MCP_API_TOKEN` (o owner implícito sin token) e impone scopes efectivos = scopes del token ∩ techo del rol, con `exigir_lectura`/`exigir_escritura`/`exigir_confirmacion` aplicados en todas las tools existentes (recetas, catálogo, hogar, despensa). E2E en contenedor `AUTH_MODE=local`: registro → token `read,confirm` (201), lectura 200, listado sin `token`/`token_hash`, revocado → 401, hash de 64 hex en BD y CLI emitiendo `read,write_draft` válido.
 **Dependencias:** T13, T14. **Tamaño:** M
 **Archivos:** `backend/app/services/auth.py`, `backend/app/api/tokens.py`, `backend/app/mcp/permissions.py`
 

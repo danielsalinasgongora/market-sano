@@ -282,6 +282,50 @@ Da de alta en el catálogo un resultado de `search_store_products`, o lo vincula
 |---|---|
 | `household://{id}/context` | Configuración completa del hogar (mismo contenido que `get_household_context`) |
 
+## Tokens, scopes y permisos (Task 15)
+
+Cada tool MCP exige un *scope* efectivo. El proceso MCP se identifica con la
+variable `MCP_API_TOKEN` (Bearer emitido por la API o por la CLI); sin token,
+`AUTH_MODE=none` opera como owner implícito del hogar por defecto.
+
+Los scopes efectivos son la **intersección** entre los del token y el techo del
+rol del usuario (T14):
+
+| Rol | Scopes máximos | Puede |
+|---|---|---|
+| `viewer` | `read` | tools de lectura |
+| `member` | `read`, `write_draft` | lectura + borradores (`dry_run`) |
+| `owner` | `read`, `write_draft`, `confirm`, `admin` | todo, incluida confirmación |
+
+| Scope | Tools |
+|---|---|
+| `read` | `get_household_context`, `get_household_preferences`, `search_recipes`, `get_recipe`, `scale_recipe`, `recipe_cost`, `search_store_products`, `get_pantry`, `get_meal_plan` |
+| `write_draft` | `create_recipe`, `import_recipe_from_url`, `rate_recipe`, `update_household_preferences`, `add_product_from_store` |
+| `confirm` | `confirm_meal_plan` (Fase 2, T16–T17) |
+| `admin` | reservado (gestión de hogar/invitaciones vía API) |
+
+Sin scope suficiente la tool responde con un `ToolError` accionable que indica
+el rol, los scopes efectivos y cómo pedir uno con más permisos.
+
+**Emitir y revocar.** El valor en claro se muestra una sola vez; en
+`api_tokens` solo queda el SHA-256.
+
+```bash
+# API (usuario autenticado)
+curl -X POST http://localhost:8000/api/v1/tokens \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "home-assistant", "scopes": ["read", "write_draft"]}'
+curl http://localhost:8000/api/v1/tokens -H "Authorization: Bearer $TOKEN"
+curl -X DELETE http://localhost:8000/api/v1/tokens/3 -H "Authorization: Bearer $TOKEN"
+
+# CLI (dentro del contenedor o con DATABASE_URL apuntando a la BD)
+python -m app.create_token --email ana@example.cl --name home-assistant \
+  --scopes read,write_draft
+```
+
+Un scope pedido por encima del rol devuelve `403`; scopes desconocidos, `422`.
+Revocar un token lo invalida de inmediato (`401`).
+
 ## Roadmap del contrato
 
 | Fase del plan | Agregados |

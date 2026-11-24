@@ -14,6 +14,7 @@ from fastmcp.exceptions import ToolError
 from sqlmodel import Session, select
 
 from app.mcp.db import mcp_engine
+from app.mcp.permissions import contexto_mcp, exigir_lectura
 from app.mcp.server import mcp
 from app.models import (
     Household,
@@ -64,7 +65,9 @@ def get_household_context(
     """Devuelve la configuración del hogar: presupuesto semanal en CLP, tienda
     por defecto, restricciones dietéticas, alergias y comuna."""
     with Session(mcp_engine()) as session:
-        return _contexto(session, _hogar(session, household_id))
+        ctx = contexto_mcp(session)
+        exigir_lectura(ctx)
+        return _contexto(session, _hogar(session, household_id or ctx.hogar.id))
 
 
 @mcp.tool
@@ -90,6 +93,7 @@ def search_recipes(
     `only_with_pantry_match` llega en Task 19.
     """
     with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
         return buscar_recetas(
             session, query, tags, max_cost_per_serving, max_time_minutes,
             store_id, sort, max_results,
@@ -109,7 +113,9 @@ def get_pantry_status(
     """Devuelve el estado de la despensa: cantidades por producto, ubicación
     e ítems próximos a vencer."""
     with Session(mcp_engine()) as session:
-        hogar = _hogar(session, household_id)
+        ctx = contexto_mcp(session)
+        exigir_lectura(ctx)
+        hogar = _hogar(session, household_id or ctx.hogar.id)
         statement = select(PantryItem).where(PantryItem.household_id == hogar.id)
         if location:
             try:
@@ -152,4 +158,5 @@ def household_context(id: Annotated[str, "ID del hogar"]) -> dict[str, Any]:
     except ValueError as exc:
         raise ToolError(f"id de hogar inválido: {id}") from exc
     with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
         return _contexto(session, _hogar(session, household_id))

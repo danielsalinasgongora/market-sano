@@ -80,6 +80,15 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def token_vigente(session: Session, token: str) -> ApiToken | None:
+    """Fila de `api_tokens` para un Bearer en claro (sin actualizar uso)."""
+    if not token or len(token) > _TOKEN_MAX:
+        return None
+    return session.exec(
+        select(ApiToken).where(ApiToken.token_hash == hash_token(token))
+    ).first()
+
+
 def aviso_privacidad() -> dict[str, Any]:
     return {
         "version": PRIVACY_NOTICE_VERSION,

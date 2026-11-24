@@ -12,8 +12,9 @@ from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.mcp.db import mcp_engine
+from app.mcp.permissions import contexto_mcp, exigir_escritura, exigir_lectura
 from app.mcp.server import mcp
-from app.services.identidad import SinHogar, owner_implicito
+from app.services.identidad import SinHogar
 from app.services.imports import ImportInvalido, importar_desde_url
 from app.services.recipes import (
     NoEncontrada,
@@ -43,6 +44,7 @@ def get_recipe(recipe_id: Annotated[int, "ID de la receta"]) -> dict[str, Any]:
     """Detalle completo de una receta: ingredientes (en g/ml/unidad del catálogo),
     pasos con duración, etiquetas y calificación promedio."""
     with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
         return _accionable(lambda: obtener_receta(session, recipe_id))
 
 
@@ -72,6 +74,9 @@ def create_recipe(
     usuario y repite con dry_run=false solo si la confirma. Si un ingrediente
     no está en el catálogo, el error sugiere nombres parecidos."""
     with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
+
         def accion() -> dict[str, Any]:
             datos = RecetaIn(
                 title=title, ingredients=ingredients, steps=steps or [],
@@ -79,8 +84,9 @@ def create_recipe(
                 instructions=instructions, prep_minutes=prep_minutes,
                 cook_minutes=cook_minutes, difficulty=difficulty, tags=tags or [],
             )
-            hogar, usuario = owner_implicito(session)
-            return crear_receta(session, hogar.id, datos, dry_run=dry_run, created_by=usuario.id)
+            return crear_receta(
+                session, ctx.hogar.id, datos, dry_run=dry_run, created_by=ctx.usuario.id
+            )
         return _accionable(accion)
 
 
@@ -96,6 +102,7 @@ def scale_recipe(
     Devuelve cada ingrediente con su cantidad original para comparar.
     """
     with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
         return _accionable(lambda: escalar_receta(session, recipe_id, target_servings))
 
 
@@ -114,6 +121,7 @@ def get_recipe_cost(
     explican qué falta; el total cubre solo lo valorizado.
     """
     with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
         return _accionable(lambda: costo_receta(session, recipe_id, store_id))
 
 
@@ -132,10 +140,12 @@ def import_recipe(
     `failed` (misma URL inválida incluida).
     """
     with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
+
         def accion() -> dict[str, Any]:
-            hogar, usuario = owner_implicito(session)
             return importar_desde_url(
-                session, hogar.id, url, dry_run=dry_run, created_by=usuario.id
+                session, ctx.hogar.id, url, dry_run=dry_run, created_by=ctx.usuario.id
             )
         return _accionable(accion)
 
@@ -148,6 +158,8 @@ def rate_recipe(
     """Califica una receta (1-5) para aprender los gustos del hogar. Devuelve el
     promedio actualizado."""
     with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
         return _accionable(
-            lambda: calificar(session, recipe_id, owner_implicito(session)[1].id, rating)
+            lambda: calificar(session, recipe_id, ctx.usuario.id, rating)
         )

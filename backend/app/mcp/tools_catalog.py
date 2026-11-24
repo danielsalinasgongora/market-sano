@@ -14,6 +14,7 @@ from sqlmodel import Session
 
 from app.connectors.supermercados_cl import ErrorConector, buscar_productos
 from app.mcp.db import mcp_engine
+from app.mcp.permissions import contexto_mcp, exigir_escritura, exigir_lectura
 from app.mcp.server import mcp
 from app.services.catalogo_abierto import AltaInvalida, alta_desde_cadena
 from app.settings import get_settings
@@ -30,6 +31,8 @@ async def search_store_products(
     Cada resultado trae name, brand, price, unitPrice + unit (PPUM por kg/lt/un),
     url y sku. Para agregar uno al catálogo, pasa sus campos a
     add_product_from_store."""
+    with Session(mcp_engine()) as session:
+        exigir_lectura(contexto_mcp(session))
     try:
         return await buscar_productos(get_settings(), store_id, query, max(1, min(limit, 50)))
     except ErrorConector as exc:
@@ -53,6 +56,7 @@ def add_product_from_store(
     actualice en vivo. Con dry_run=true devuelve la vista previa sin escribir:
     muéstrala al usuario y repite con dry_run=false solo si la confirma."""
     with Session(mcp_engine()) as session:
+        exigir_escritura(contexto_mcp(session))
         try:
             return alta_desde_cadena(
                 session, store_id=store_id, store_url=store_url, sku=sku,

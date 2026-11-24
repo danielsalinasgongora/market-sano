@@ -11,6 +11,7 @@ from fastmcp.exceptions import ToolError
 from sqlmodel import Session
 
 from app.mcp.db import mcp_engine
+from app.mcp.permissions import contexto_mcp, exigir_escritura, exigir_lectura
 from app.mcp.server import mcp
 from app.services.households import (
     HogarNoEncontrado,
@@ -19,7 +20,7 @@ from app.services.households import (
     actualizar_preferencias,
     preferencias,
 )
-from app.services.identidad import SinHogar, owner_implicito
+from app.services.identidad import SinHogar
 
 
 def _accionable(fn: Any) -> Any:
@@ -34,10 +35,9 @@ def get_household_preferences() -> dict[str, Any]:
     """Preferencias del hogar: cadena por defecto, comuna, restricciones
     alimentarias, alergias y productos que nunca se compran."""
     with Session(mcp_engine()) as session:
-        def accion() -> dict[str, Any]:
-            hogar, usuario = owner_implicito(session)
-            return preferencias(session, usuario, hogar.id)
-        return _accionable(accion)
+        ctx = contexto_mcp(session)
+        exigir_lectura(ctx)
+        return _accionable(lambda: preferencias(session, ctx.usuario, ctx.hogar.id))
 
 
 @mcp.tool
@@ -74,7 +74,8 @@ def update_household_preferences(
         raise ToolError("Envía al menos una preferencia para actualizar.")
 
     with Session(mcp_engine()) as session:
-        def accion() -> dict[str, Any]:
-            hogar, usuario = owner_implicito(session)
-            return actualizar_preferencias(session, usuario, hogar.id, cambios)
-        return _accionable(accion)
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
+        return _accionable(
+            lambda: actualizar_preferencias(session, ctx.usuario, ctx.hogar.id, cambios)
+        )
