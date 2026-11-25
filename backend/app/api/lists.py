@@ -76,7 +76,7 @@ def obtener(
     list_id: int,
     session: Annotated[Session, Depends(get_session)],
     ctx: Annotated[ContextoHogar, Depends(contexto)],
-    group_by: Annotated[str, Query(default="aisle")] = "aisle",
+    group_by: Annotated[str, Query(description="Agrupar por 'aisle' o 'store'")] = "aisle",
 ) -> dict:
     """Detalles de una lista de compras."""
     return obtener_lista(session, ctx.hogar.id, list_id, group_by)

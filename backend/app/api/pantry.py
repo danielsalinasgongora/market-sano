@@ -124,7 +124,7 @@ def resumen(
     ctx: Annotated[ContextoHogar, Depends(contexto)],
     start_date: date = ...,
     end_date: Annotated[date | None, Query(description="Filtrar hasta fecha")] = None,
-    group_by: Annotated[str, Query(description="Agrupar por 'category' o 'store'")] = "category",
+    group_by: Annotated[str, Query(description="Agrupar por 'category' o 'store'")] = "category"
 ) -> dict:
     """Resumen de gastos agrupados."""
     return get_spending_summary(session, ctx.hogar.id, start_date, end_date, group_by)
@@ -135,7 +135,7 @@ def varianza(
     session: Annotated[Session, Depends(get_session)],
     ctx: Annotated[ContextoHogar, Depends(contexto)],
     start_date: date = ...,
-    end_date: Annotated[date | None, Query()] = None,
+    end_date: date | None = None,
 ) -> dict:
     """Compara gastos reales vs presupuesto planificado."""
     if end_date is None:
