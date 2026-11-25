@@ -8,12 +8,12 @@ from sqlmodel import Session, select
 
 from app.models import Household, PantryItem, ProductCatalog, Recipe
 from app.services.expenses import get_budget_variance, get_spending_summary, registrar_gasto
-from app.services.pantry import ajustar_cantidad, get_pantry_shortfall, obtener_status
+from app.services.pantry import get_pantry_shortfall, obtener_status
 
 
 def test_pantry_ajustar_cantidad(engine_sembrado) -> None:
     """Ajustar cantidad genera movimiento."""
-    from app.models import MovementReason
+    from app.models.enums import MovementReason
     from app.services.pantry import ajustar_cantidad
 
     hogar = _get_hogar(engine_sembrado)

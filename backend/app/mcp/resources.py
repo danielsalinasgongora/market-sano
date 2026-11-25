@@ -14,7 +14,7 @@ from sqlmodel import Session
 from app.mcp.db import mcp_engine
 from app.mcp.permissions import contexto_mcp, exigir_lectura
 from app.mcp.server import mcp
-from app.models import Household, HouseholdPreference, PantryItem
+from app.models import Household, HouseholdPreference
 from app.services.pantry import obtener_status
 
 
