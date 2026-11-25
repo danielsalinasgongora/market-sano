@@ -247,6 +247,31 @@ def _cadenas_por_defecto(session: Session, household_id: int) -> list[str]:
     return [conector.name if conector else "jumbo"]
 
 
+def _detalle_receta(
+    session: Session, recipe_id: int, store_id: str, cache: dict[int, dict[str, Any]]
+) -> dict[str, Any]:
+    if recipe_id not in cache:
+        cache[recipe_id] = costo_receta(session, recipe_id, store_id)
+    return cache[recipe_id]
+
+
+def _costo_entrada(
+    session: Session,
+    entrada: MealPlanEntry,
+    store_id: str,
+    cache: dict[int, dict[str, Any]],
+) -> tuple[int, bool, list[str]]:
+    """(costo CLP, completo, faltantes) de una entrada del plan."""
+    if entrada.recipe_id is None:
+        return entrada.estimated_cost_clp or 0, True, []
+    detalle = _detalle_receta(session, entrada.recipe_id, store_id, cache)
+    return (
+        a_clp(detalle["total_clp"] * entrada.servings_multiplier),
+        detalle["is_complete"],
+        detalle["missing_products"],
+    )
+
+
 def _costo_entradas(
     session: Session, plan: MealPlan, store_id: str
 ) -> tuple[int, bool, list[str], list[dict[str, Any]]]:
@@ -260,36 +285,23 @@ def _costo_entradas(
     faltantes: set[str] = set()
     lineas: list[dict[str, Any]] = []
     for entrada in entradas:
-        if entrada.recipe_id is None:
-            costo = entrada.estimated_cost_clp or 0
-            lineas.append({
-                "entry_id": entrada.id,
-                "date": entrada.date.isoformat(),
-                "meal_slot": entrada.meal_slot.value,
-                "recipe_id": None,
-                "title": entrada.label or "Noche libre",
-                "servings_multiplier": entrada.servings_multiplier,
-                "cost_clp": costo,
-                "is_complete": True,
-            })
-            total += costo
-            continue
-        if entrada.recipe_id not in cache:
-            cache[entrada.recipe_id] = costo_receta(session, entrada.recipe_id, store_id)
-        detalle = cache[entrada.recipe_id]
-        costo = a_clp(detalle["total_clp"] * entrada.servings_multiplier)
-        if not detalle["is_complete"]:
+        costo, entrada_completa, faltan = _costo_entrada(session, entrada, store_id, cache)
+        if not entrada_completa:
             completo = False
-            faltantes.update(detalle["missing_products"])
+            faltantes.update(faltan)
+        if entrada.recipe_id is None:
+            titulo = entrada.label or "Noche libre"
+        else:
+            titulo = cache[entrada.recipe_id]["title"]
         lineas.append({
             "entry_id": entrada.id,
             "date": entrada.date.isoformat(),
             "meal_slot": entrada.meal_slot.value,
             "recipe_id": entrada.recipe_id,
-            "title": detalle["title"],
+            "title": titulo,
             "servings_multiplier": entrada.servings_multiplier,
             "cost_clp": costo,
-            "is_complete": detalle["is_complete"],
+            "is_complete": entrada_completa,
         })
         total += costo
     return total, completo, sorted(faltantes), lineas
@@ -618,3 +630,166 @@ def confirmar_plan(
     session.commit()
     session.refresh(plan)
     return {**_plan_dict(session, plan), "budget": estado}
+
+
+def intercambiar_comida(
+    session: Session,
+    household_id: int,
+    plan_id: int,
+    entry_id: int,
+    new_recipe_id: int,
+    *,
+    store_id: str | None = None,
+    variety_weeks: int = VARIETY_WEEKS,
+) -> dict[str, Any]:
+    """Reemplaza una entrada por `new_recipe_id` y reequilibra si se pasa del
+    presupuesto, cambiando otras cenas por alternativas más baratas sin repetir
+    en la ventana de variedad.
+
+    Devuelve el costo de la nueva entrada, el costo del plan antes/después y el
+    delta contra el presupuesto, más el detalle documentado del reequilibrio.
+    """
+    plan = _plan_del_hogar(session, plan_id, household_id)
+    if plan.status is not PlanStatus.draft:
+        raise PlanInvalido(
+            f"El plan está {plan.status.value}: no admite intercambios. "
+            "Trabaja sobre un plan draft."
+        )
+    entrada = session.get(MealPlanEntry, entry_id)
+    if entrada is None or entrada.plan_id != plan.id:
+        raise PlanNoEncontrado(f"No existe la entrada {entry_id} en el plan {plan.id}.")
+    nueva = _validar_receta(session, new_recipe_id, household_id)
+    if entrada.recipe_id == new_recipe_id:
+        raise PlanInvalido(
+            f"La entrada ya tiene la receta '{nueva.title}'; elige otra para intercambiar."
+        )
+
+    cadena = (store_id or "").strip() or _cadenas_por_defecto(session, household_id)[0]
+    entradas = session.exec(
+        select(MealPlanEntry).where(MealPlanEntry.plan_id == plan.id)
+    ).all()
+    recientes = _recetas_recientes(session, household_id, plan.week_start, variety_weeks)
+    usadas = {e.recipe_id for e in entradas if e.recipe_id and e.id != entrada.id}
+    if new_recipe_id in usadas or new_recipe_id in recientes:
+        raise PlanInvalido(
+            f"La receta '{nueva.title}' ya está planificada esta semana o en las "
+            f"últimas {variety_weeks} semanas. Elige otra para mantener la variedad."
+        )
+
+    cache: dict[int, dict[str, Any]] = {}
+    antes = 0
+    for fila in entradas:
+        costo_fila, _, _ = _costo_entrada(session, fila, cadena, cache)
+        antes += costo_fila
+    costo_viejo, _, _ = _costo_entrada(session, entrada, cadena, cache)
+    if entrada.recipe_id is None:
+        vieja_titulo = entrada.label or "Noche libre"
+    else:
+        vieja_titulo = cache[entrada.recipe_id]["title"]
+    vieja_id = entrada.recipe_id
+
+    entrada.recipe_id = new_recipe_id
+    entrada.label = None
+    entrada.estimated_cost_clp = None
+    costo_nuevo, _, _ = _costo_entrada(session, entrada, cadena, cache)
+    total = antes - costo_viejo + costo_nuevo
+
+    usadas_actuales = {e.recipe_id for e in entradas if e.recipe_id}
+    candidatas = [
+        c
+        for c in _candidatas(
+            session, household_id, plan.week_start, cadena, variety_weeks
+        )
+        if c["recipe_id"] not in usadas_actuales
+    ]
+
+    cambios: list[dict[str, Any]] = []
+    while total > plan.budget_clp:
+        mejor: tuple[MealPlanEntry, dict[str, Any], int, int] | None = None
+        for fila in entradas:
+            if fila.recipe_id is None or fila.id == entrada.id:
+                continue
+            actual, _, _ = _costo_entrada(session, fila, cadena, cache)
+            for candidata in candidatas:
+                if candidata["recipe_id"] in usadas_actuales:
+                    continue
+                nuevo_costo = a_clp(
+                    candidata["cost_clp"] * fila.servings_multiplier
+                )
+                if nuevo_costo >= actual:
+                    break  # ordenadas por costo: ninguna siguiente ahorra
+                ahorro = actual - nuevo_costo
+                if mejor is None or ahorro > mejor[3]:
+                    mejor = (fila, candidata, nuevo_costo, ahorro)
+                break
+        if mejor is None:
+            session.rollback()
+            raise PlanInvalido(
+                f"El intercambio deja el plan en {_clp(total)} y el presupuesto es "
+                f"{_clp(plan.budget_clp)}; no quedan cenas más baratas disponibles "
+                f"sin repetir en {variety_weeks} semanas. Elige una receta más barata, "
+                "sube el presupuesto o reduce las noches libres."
+            )
+        fila, candidata, nuevo_costo, ahorro = mejor
+        anterior_costo, _, _ = _costo_entrada(session, fila, cadena, cache)
+        anterior_id = fila.recipe_id
+        anterior_titulo = cache[fila.recipe_id]["title"]
+        fila.recipe_id = candidata["recipe_id"]
+        fila.label = None
+        fila.estimated_cost_clp = None
+        usadas_actuales.add(candidata["recipe_id"])
+        total -= ahorro
+        cambios.append({
+            "entry_id": fila.id,
+            "date": fila.date.isoformat(),
+            "meal_slot": fila.meal_slot.value,
+            "from_recipe_id": anterior_id,
+            "from_recipe_title": anterior_titulo,
+            "to_recipe_id": candidata["recipe_id"],
+            "to_recipe_title": candidata["recipe_title"],
+            "from_cost_clp": anterior_costo,
+            "to_cost_clp": nuevo_costo,
+            "saving_clp": ahorro,
+        })
+
+    session.commit()
+    _, completo, faltantes, lineas = _costo_entradas(session, plan, cadena)
+    delta = plan.budget_clp - total
+    if cambios:
+        razon = (
+            f"El intercambio pasaba el presupuesto; se ajustaron {len(cambios)} "
+            f"cena(s) a alternativas más baratas sin repetir en {variety_weeks} "
+            "semanas."
+        )
+    else:
+        razon = "Sin reequilibrio: el plan queda dentro del presupuesto."
+    return {
+        "plan_id": plan.id,
+        "week_start": plan.week_start.isoformat(),
+        "store_id": cadena,
+        "swap": {
+            "entry_id": entrada.id,
+            "date": entrada.date.isoformat(),
+            "meal_slot": entrada.meal_slot.value,
+            "from_recipe_id": vieja_id,
+            "from_recipe_title": vieja_titulo,
+            "to_recipe_id": new_recipe_id,
+            "to_recipe_title": nueva.title,
+            "from_cost_clp": costo_viejo,
+            "to_cost_clp": costo_nuevo,
+        },
+        "new_entry_cost_clp": costo_nuevo,
+        "plan_cost_before_clp": antes,
+        "plan_cost_clp": total,
+        "budget_clp": plan.budget_clp,
+        "delta_vs_budget_clp": delta,
+        "within_budget": delta >= 0,
+        "is_complete": completo,
+        "missing_products": faltantes,
+        "rebalance": {
+            "applied": bool(cambios),
+            "reason": razon,
+            "changes": cambios,
+        },
+        "entries": lineas,
+    }

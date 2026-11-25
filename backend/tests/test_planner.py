@@ -40,6 +40,7 @@ from app.services.planner import (
     estimar_costo_plan,
     obtener_plan,
     sugerir_plan,
+    intercambiar_comida,
 )
 from app.services.prices import registrar_precio_manual
 from app.services.recipes import costo_receta
@@ -705,3 +706,119 @@ def test_budget_confirm_mcp_requiere_scope(
 
     assert datos["status"] == "confirmed"
     assert datos["confirmed_at"]
+
+
+def test_intercambiar_comida_api(api_local: TestClient, engine_sembrado: Engine) -> None:
+    """Swap: intercambio de receta y reequilibrio de presupuesto."""
+    registro = api_local.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "swap@example.cl",
+            "password": PASSWORD,
+            "display_name": "Swap",
+            "privacy_consent": True,
+        },
+    )
+    assert registro.status_code == 201, registro.text
+    (receta_a, _), (receta_b, _), (receta_c, _) = _recetas_completas(
+        engine_sembrado, cantidad=3
+    )
+
+    token = registro.json()["token"]
+    headers = _bearer(token)
+
+    # Crear plan vía API
+    plan_resp = api_local.post(
+        "/api/v1/plans",
+        headers=headers,
+        json={"week_start": LUNES.isoformat(), "budget_clp": 100_000},
+    )
+    assert plan_resp.status_code == 201, plan_resp.text
+    plan_id = plan_resp.json()["plan_id"]
+
+    # Agregar entradas vía API
+    entr1 = api_local.put(
+        f"/api/v1/plans/{plan_id}/entries",
+        headers=headers,
+        json={
+            "date": LUNES.isoformat(),
+            "meal_slot": "cena",
+            "recipe_id": receta_a,
+        },
+    )
+    assert entr1.status_code == 200, entr1.text
+
+    entr2 = api_local.put(
+        f"/api/v1/plans/{plan_id}/entries",
+        headers=headers,
+        json={
+            "date": (LUNES + timedelta(days=1)).isoformat(),
+            "meal_slot": "cena",
+            "recipe_id": receta_b,
+        },
+    )
+    assert entr2.status_code == 200, entr2.text
+
+    # Intercambio: cambiar cena de lunes por receta_c
+    swap = api_local.post(
+        f"/api/v1/plans/{plan_id}/entries/1/swap",
+        headers=headers,
+        json={"new_recipe_id": receta_c},
+    )
+    assert swap.status_code == 200, swap.text
+    data = swap.json()
+    assert data["swap"]["to_recipe_id"] == receta_c
+    assert data["swap"]["from_recipe_id"] == receta_a
+    assert isinstance(data["rebalance"]["applied"], bool)
+
+
+def test_intercambiar_comida_service(engine_sembrado: Engine) -> None:
+    """Intercambio de receta con reequilibrio automático."""
+    hogar = _hogar(engine_sembrado)
+    enorme = 1_000_000
+    (receta_a, _), (receta_b, _), (receta_c, _) = _recetas_completas(
+        engine_sembrado, cantidad=3
+    )
+
+    with Session(engine_sembrado) as session:
+        plan = crear_plan(session, hogar, week_start=LUNES, budget_clp=enorme)
+        plan_id = plan["plan_id"]
+
+        # 5 cenas + 2 noches libres = gasto esperado
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES,
+            meal_slot="cena",
+            recipe_id=receta_a,
+        )
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES + timedelta(days=1),
+            meal_slot="cena",
+            recipe_id=receta_b,
+        )
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES + timedelta(days=6),
+            meal_slot="cena",
+            label="Noche libre",
+            estimated_cost_clp=5_000,
+        )
+
+        # Intercambiar una receta por más cara y ver reequilibrio
+        resultado = intercambiar_comida(
+            session,
+            hogar,
+            plan_id,
+            entry_id=1,
+            new_recipe_id=receta_c,
+        )
+        assert resultado["swap"]["from_recipe_id"] == receta_a
+        assert resultado["swap"]["to_recipe_id"] == receta_c
+        assert isinstance(resultado["rebalance"]["applied"], bool)

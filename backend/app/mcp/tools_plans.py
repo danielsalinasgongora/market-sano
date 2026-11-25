@@ -3,7 +3,7 @@
 
 Lectura (`get_meal_plan`, `get_budget_status`) exige scope `read`; escritura
 (`create_meal_plan`, `set_meal_plan_entry`, `delete_meal_plan_entry`,
-`estimate_meal_plan_cost`) exige `write_draft`.
+`estimate_meal_plan_cost`, `swap_meal_plan_entry`) exige `write_draft`.
 """
 
 from datetime import date, timedelta
@@ -29,13 +29,14 @@ from app.services.planner import (
     eliminar_entrada,
     estado_presupuesto,
     estimar_costo_plan,
+    intercambiar_comida,
     listar_planes,
     normalizar_semana,
     obtener_plan,
     sugerir_plan,
+    VARIETY_WEEKS,
 )
 from app.services.recipes import NoEncontrada
-from app.settings import get_settings
 
 
 def _accionable(fn: Any) -> Any:
@@ -259,3 +260,36 @@ def confirm_meal_plan(plan_id: Annotated[int, "ID del plan draft"]) -> dict[str,
         ctx = contexto_mcp(session)
         exigir_confirmacion(ctx)
         return _accionable(lambda: confirmar_plan(session, ctx.hogar.id, plan_id))
+
+
+@mcp.tool
+def swap_meal_plan_entry(
+    plan_id: Annotated[int, "ID del plan draft"],
+    entry_id: Annotated[int, "ID de la entrada a intercambiar"],
+    new_recipe_id: Annotated[int, "ID de la nueva receta"],
+    store_id: Annotated[str | None, "Cadena para costos; omitir usa la del hogar"] = None,
+    variety_weeks: Annotated[
+        int | None, "Semanas sin repetir receta; omitir usa 4"
+    ] = None,
+) -> dict[str, Any]:
+    """Intercambia una entrada por otra receta y reequilibra el presupuesto.
+
+    Cambia la receta de la entrada y, si pasa el presupuesto, reemplaza
+    otras cenas por alternativas más baratas sin repetir en la ventana de variedad.
+    Exige scope `write_draft` y que el plan esté en estado draft."""
+    with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
+        return _accionable(
+            lambda: intercambiar_comida(
+                session,
+                ctx.hogar.id,
+                plan_id,
+                entry_id,
+                new_recipe_id,
+                store_id=store_id,
+                variety_weeks=(
+                    VARIETY_WEEKS if variety_weeks is None else variety_weeks
+                ),
+            )
+        )

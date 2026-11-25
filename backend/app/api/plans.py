@@ -23,6 +23,7 @@ from app.services.planner import (
     crear_plan,
     estado_presupuesto,
     estimar_costo_plan,
+    intercambiar_comida,
     listar_planes,
     obtener_plan,
     sugerir_plan,
@@ -56,6 +57,11 @@ class EntradaIn(BaseModel):
 
 class EstimacionIn(BaseModel):
     store_ids: list[str] | None = None
+
+
+class SwapIn(BaseModel):
+    new_recipe_id: int
+    store_id: str | None = None
 
 
 class SugerenciaIn(BaseModel):
@@ -217,3 +223,24 @@ def confirmar(
 ) -> dict[str, Any]:
     """Confirma el plan (requiere token con scope `confirm`) y lo congela."""
     return _errores(lambda: confirmar_plan(session, ctx.hogar.id, plan_id))
+
+
+@router.post("/{plan_id}/entries/{entry_id}/swap")
+def intercambiar(
+    plan_id: int,
+    entry_id: int,
+    datos: SwapIn,
+    session: SesionDep,
+    ctx: Annotated[ContextoHogar, Depends(requiere_escritura)],
+) -> dict[str, Any]:
+    """Intercambia una entrada por otra receta y reequilibra el presupuesto."""
+    return _errores(
+        lambda: intercambiar_comida(
+            session,
+            ctx.hogar.id,
+            plan_id,
+            entry_id,
+            datos.new_recipe_id,
+            store_id=datos.store_id,
+        )
+    )
