@@ -8,13 +8,11 @@ Reglas:
 - Ítems manuales, exportación CSV/texto.
 """
 
-from datetime import date
 from typing import Any
 
 from sqlmodel import Session, select
 
 from app.models import (
-    Household,
     MealPlan,
     MealPlanEntry,
     PantryItem,
@@ -23,7 +21,6 @@ from app.models import (
     ShoppingListItem,
 )
 from app.models.enums import ListStatus
-from app.services.pantry import get_pantry_shortfall
 
 
 class ShoppingError(ValueError):

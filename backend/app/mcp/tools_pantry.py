@@ -19,19 +19,17 @@ from app.mcp.permissions import (
 )
 from app.mcp.server import mcp
 from app.models.enums import MovementReason
-from app.services.pantry import (
-    PantryError,
-    ajustar_cantidad,
-    get_pantry_shortfall,
-    obtener_despensa,
-    obtener_status,
-)
 from app.services.expenses import (
     ExpenseError,
     get_budget_variance,
     get_spending_summary,
     registrar_gasto,
-    obtener_gastos,
+)
+from app.services.pantry import (
+    PantryError,
+    ajustar_cantidad,
+    get_pantry_shortfall,
+    obtener_status,
 )
 from app.services.shopping import (
     ShoppingError,
@@ -80,11 +78,11 @@ def adjust_pantry_item(
         exigir_escritura(ctx)
         try:
             reason_enum = MovementReason(reason.lower())
-        except ValueError:
+        except ValueError as exc:
             raise ToolError(
                 f"Motivo inválido: {reason}. Usa: purchase, recipe_consumption, "
                 "manual_adjustment o spoilage."
-            )
+            ) from exc
         return _accionable(
             lambda: ajustar_cantidad(
                 session, ctx.hogar.id, product_id, delta, reason_enum, reference_id
@@ -116,7 +114,6 @@ def record_expense(
     notes: Annotated[str | None, "Notas opcionales"] = None,
 ) -> dict[str, Any]:
     """Registra un gasto real del hogar."""
-    from datetime import datetime
 
     with Session(mcp_engine()) as session:
         ctx = contexto_mcp(session)

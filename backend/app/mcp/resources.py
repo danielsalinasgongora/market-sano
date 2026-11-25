@@ -8,12 +8,12 @@ Resources:
 - pantry://{id}/status - Estado de la despensa
 """
 
-from fastmcp import FastMCP
-from app.mcp.server import mcp
 from sqlmodel import Session, select
+
 from app.mcp.db import mcp_engine
 from app.mcp.permissions import contexto_mcp, exigir_lectura
-from app.models import Household, MealPlan, ShoppingList, PantryItem
+from app.mcp.server import mcp
+from app.models import Household
 from app.services.pantry import obtener_status
 
 
@@ -50,7 +50,6 @@ def get_household_context_resource(household_id: int) -> dict:
 def get_meal_plan_resource(plan_id: int) -> dict:
     """Detalles de un plan de comidas específico."""
     from app.services.planner import obtener_plan
-    from app.services.households import ContextoHogar
 
     with Session(mcp_engine()) as session:
         ctx = contexto_mcp(session)

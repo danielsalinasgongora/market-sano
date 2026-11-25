@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlmodel import Session, select
 
-from app.models import Expense, ExpenseCategory, ExpenseItem, Household, MealPlan
+from app.models import Expense, ExpenseCategory, ExpenseItem, MealPlan
 
 
 class ExpenseError(ValueError):

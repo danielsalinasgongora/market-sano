@@ -7,7 +7,6 @@ Tres prompts principales:
 3. compare_current_basket - Compara costos entre cadenas
 """
 
-from fastmcp import FastMCP
 from app.mcp.server import mcp
 
 

@@ -4,10 +4,9 @@
 Endpoints REST para generación, visualización y comparación de listas de compras.
 """
 
-from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session
 
@@ -15,7 +14,6 @@ from app.api.deps import contexto, requiere_escritura
 from app.db import get_session
 from app.services.households import ContextoHogar
 from app.services.shopping import (
-    ShoppingError,
     comparar_basket_across_stores,
     generar_lista,
     obtener_lista,
@@ -54,6 +52,7 @@ def listar_listas(
 ) -> list[dict]:
     """Lista de compras activas del hogar."""
     from sqlmodel import select
+
     from app.models import ShoppingList
     listas = session.exec(
         select(ShoppingList)
@@ -103,6 +102,7 @@ def lista_activa(
 ) -> dict:
     """Lista de compras activa del hogar."""
     from sqlmodel import select
+
     from app.models import ShoppingList
     lista = session.exec(
         select(ShoppingList)
