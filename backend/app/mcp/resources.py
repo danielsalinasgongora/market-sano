@@ -8,12 +8,13 @@ Resources:
 - pantry://{id}/status - Estado de la despensa
 """
 
-from sqlmodel import Session, select
+from fastmcp.exceptions import ToolError
+from sqlmodel import Session
 
 from app.mcp.db import mcp_engine
 from app.mcp.permissions import contexto_mcp, exigir_lectura
 from app.mcp.server import mcp
-from app.models import Household, HouseholdPreference
+from app.models import Household, HouseholdPreference, PantryItem
 from app.services.pantry import obtener_status
 
 
@@ -26,23 +27,20 @@ def get_household_context_resource(household_id: int) -> dict:
 
         hogar = session.get(Household, household_id)
         if hogar is None:
-            return {"error": "No existe el hogar"}
+            raise ToolError(f"No existe el hogar {household_id}.")
 
-        preferencia = session.exec(
-            select(HouseholdPreference)
-            .where(HouseholdPreference.household_id == household_id)
-        ).first()
+        preferencia = session.get(HouseholdPreference, household_id)
 
         return {
-            "household": {
-                "id": hogar.id,
-                "name": hogar.name,
-                "currency": hogar.currency,
-            },
-            "preferences": {
-                "default_store_id": preferencia.default_store_id if preferencia else None,
-                "comuna": preferencia.comuna if preferencia else None,
-            },
+            "id": hogar.id,
+            "name": hogar.name,
+            "currency": hogar.currency,
+            "weekly_budget_clp": hogar.default_weekly_budget_clp,
+            "default_store": preferencia.default_store_id if preferencia else None,
+            "dietary_restrictions": preferencia.dietary_restrictions if preferencia else [],
+            "allergies": preferencia.allergies if preferencia else [],
+            "never_buy": preferencia.never_buy if preferencia else [],
+            "comuna": preferencia.comuna if preferencia else None,
         }
 
 

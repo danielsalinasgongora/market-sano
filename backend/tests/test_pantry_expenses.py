@@ -13,6 +13,9 @@ from app.services.pantry import ajustar_cantidad, get_pantry_shortfall, obtener_
 
 def test_pantry_ajustar_cantidad(engine_sembrado) -> None:
     """Ajustar cantidad genera movimiento."""
+    from app.models import MovementReason
+    from app.services.pantry import ajustar_cantidad
+
     hogar = _get_hogar(engine_sembrado)
 
     with Session(engine_sembrado) as session:
@@ -20,8 +23,20 @@ def test_pantry_ajustar_cantidad(engine_sembrado) -> None:
         if producto is None:
             pytest.skip("No hay productos en la semilla")
 
+        # Primero agregamos el item a la despensa (simulando un registro inicial)
+        despensa = PantryItem(
+            household_id=hogar,
+            product_id=producto.id,
+            quantity=0.0,
+            unit="kg",
+        )
+        session.add(despensa)
+        session.commit()
+
         # Comprar: +1kg
-        resultado = ajustar_cantidad(session, hogar, producto.id, 1.0, "purchase")
+        resultado = ajustar_cantidad(
+            session, hogar, producto.id, 1.0, MovementReason.purchase
+        )
         assert resultado["quantity"] == 1.0
         assert resultado["movement"]["delta"] == 1.0
         assert resultado["movement"]["reason"] == "purchase"

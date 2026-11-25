@@ -85,7 +85,7 @@ def obtener_despensa(
         producto = session.get(ProductCatalog, item.product_id)
         resultado.append({
             "product_id": item.product_id,
-            "product_name": producto.name if producto else "Desconocido",
+            "product_name": producto.canonical_name if producto else "Desconocido",
             "quantity": item.quantity,
             "unit": item.unit,
             "location": item.location.value,
@@ -132,7 +132,7 @@ def get_pantry_shortfall(
     ingredientes = session.exec(
         select(RecipeIngredient)
         .where(RecipeIngredient.recipe_id == recipe_id)
-        .order_by(RecipeIngredient.position)
+        .order_by(RecipeIngredient.sort_order)
     ).all()
 
     falten: list[dict[str, Any]] = []
@@ -154,7 +154,7 @@ def get_pantry_shortfall(
         if disponible < requerido:
             falten.append({
                 "product_id": ing.product_id,
-                "product_name": producto.name,
+                "product_name": producto.canonical_name,
                 "required": requerido,
                 "available": disponible,
                 "shortfall": requerido - disponible,
