@@ -33,12 +33,18 @@ from app.services.expenses import (
     registrar_gasto,
     obtener_gastos,
 )
+from app.services.shopping import (
+    ShoppingError,
+    comparar_basket_across_stores,
+    generar_lista,
+    obtener_lista,
+)
 
 
 def _accionable(fn: Any) -> Any:
     try:
         return fn()
-    except (PantryError, ExpenseError) as exc:
+    except (PantryError, ExpenseError, ShoppingError) as exc:
         raise ToolError(str(exc)) from exc
 
 
@@ -178,3 +184,46 @@ def get_budget_variance_tool(
             raise ToolError(f"start_date inválida: {start_date!r}. Usa YYYY-MM-DD.") from exc
 
         return _accionable(lambda: get_budget_variance(session, ctx.hogar.id, start))
+
+
+# === Shopping List ===
+
+@mcp.tool
+def generate_shopping_list(
+    name: Annotated[str, "Nombre de la lista"] = "Lista de compras",
+    plan_id: Annotated[int | None, "ID del plan para generar desde sus recetas"] = None,
+    store_ids: Annotated[list[str] | None, "Cadenas a incluir"] = None,
+) -> dict[str, Any]:
+    """Genera lista de compras desde un plan, descuenta despensa."""
+    with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_escritura(ctx)
+        return _accionable(
+            lambda: generar_lista(session, ctx.hogar.id, plan_id, store_ids, name)
+        )
+
+
+@mcp.tool
+def get_shopping_list(
+    list_id: Annotated[int, "ID de la lista"],
+    group_by: Annotated[str, "Agrupar por 'aisle' o 'store'"] = "aisle",
+) -> dict[str, Any]:
+    """Detalles de una lista de compras."""
+    with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_lectura(ctx)
+        return _accionable(lambda: obtener_lista(session, ctx.hogar.id, list_id, group_by))
+
+
+@mcp.tool
+def compare_basket_across_stores_tool(
+    list_id: Annotated[int, "ID de la lista"],
+    threshold_pct: Annotated[float, "Umbral de ahorro para sugerir división"] = 0.10,
+) -> dict[str, Any]:
+    """Compara costo de la lista por cadena usando PPUM.
+
+    Devuelve total por cadena y sugiere 'dividir la compra' si el ahorro supera el umbral."""
+    with Session(mcp_engine()) as session:
+        ctx = contexto_mcp(session)
+        exigir_lectura(ctx)
+        return _accionable(lambda: comparar_basket_across_stores(session, ctx.hogar.id, list_id, threshold_pct))
