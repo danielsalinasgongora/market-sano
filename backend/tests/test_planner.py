@@ -822,3 +822,68 @@ def test_intercambiar_comida_service(engine_sembrado: Engine) -> None:
         assert resultado["swap"]["from_recipe_id"] == receta_a
         assert resultado["swap"]["to_recipe_id"] == receta_c
         assert isinstance(resultado["rebalance"]["applied"], bool)
+
+
+def test_intercambiar_reequilibra_con_presupuesto_corto(
+    engine_sembrado: Engine,
+) -> None:
+    """Swap que excede presupuesto dispara reequilibrio automático."""
+    hogar = _hogar(engine_sembrado)
+    (receta_a, costo_a), (receta_b, costo_b), (receta_c, costo_c) = _recetas_completas(
+        engine_sembrado, cantidad=3
+    )
+
+    with Session(engine_sembrado) as session:
+        # Presupuesto justo para 2 recetas + noche libre, sin margen
+        plan = crear_plan(
+            session,
+            hogar,
+            week_start=LUNES,
+            budget_clp=costo_a + costo_b + 5_000 + 2_000,  # margen pequeño
+        )
+        plan_id = plan["plan_id"]
+
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES,
+            meal_slot="cena",
+            recipe_id=receta_a,
+        )
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES + timedelta(days=1),
+            meal_slot="cena",
+            recipe_id=receta_b,
+        )
+        definir_entrada(
+            session,
+            hogar,
+            plan_id,
+            fecha=LUNES + timedelta(days=6),
+            meal_slot="cena",
+            label="Noche libre",
+            estimated_cost_clp=5_000,
+        )
+
+        # Swap a receta más cara debería disparar reequilibrio
+        resultado = intercambiar_comida(
+            session,
+            hogar,
+            plan_id,
+            entry_id=1,
+            new_recipe_id=receta_c,
+        )
+
+        # Verificar reequilibrio aplicado
+        assert resultado["plan_cost_clp"] <= resultado["budget_clp"]
+        assert resultado["delta_vs_budget_clp"] >= 0
+        assert resultado["rebalance"]["applied"] is True
+        assert len(resultado["rebalance"]["changes"]) > 0
+
+        # Verificar que el swap se aplicó correctamente
+        assert resultado["swap"]["to_recipe_id"] == receta_c
+        assert isinstance(resultado["rebalance"]["changes"], list)
