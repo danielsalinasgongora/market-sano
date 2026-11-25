@@ -8,6 +8,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
+from sqlmodel import Session
 
 from app.db import get_engine
 from app.main import create_app
@@ -41,3 +42,17 @@ def migrated_engine(tmp_path: Path) -> Engine:
     db_url = f"sqlite:///{tmp_path.as_posix()}/db.sqlite3"
     command.upgrade(alembic_config_for(db_url), "head")
     return get_engine(db_url)
+
+
+@pytest.fixture()
+def engine_sembrado(tmp_path: Path) -> Engine:
+    """Motor con datos semilla (products, recipes, pantry, etc.)."""
+    from app.db import get_engine
+    from app.seed import seed
+
+    db_url = f"sqlite:///{tmp_path.as_posix()}/seeded.db"
+    command.upgrade(alembic_config_for(db_url), "head")
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        seed(session)
+    return engine

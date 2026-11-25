@@ -45,11 +45,9 @@ def _data(resultado: Any) -> Any:
 
 
 @pytest.fixture()
-def mcp_seeded(migrated_engine: Engine) -> Any:
+def mcp_seeded(engine_sembrado: Engine) -> Any:
     """Servidor MCP apuntando a una BD migrada y sembrada."""
-    with Session(migrated_engine) as session:
-        seed(session)
-    set_mcp_engine(migrated_engine)
+    set_mcp_engine(engine_sembrado)
     yield mcp
     set_mcp_engine(None)
 
