@@ -104,7 +104,10 @@ def obtener_status(
     desde = date.today() + timedelta(days=expiring_within_days)
     items = obtener_despensa(session, household_id)
 
-    vencen = [i for i in items if i["expires_at"] and i["expires_at"] <= desde]
+    vencen = [
+        i for i in items
+        if i["expires_at"] and date.fromisoformat(i["expires_at"]) <= desde
+    ]
 
     total_items = len(items)
     total_qty = sum(i["quantity"] for i in items)
