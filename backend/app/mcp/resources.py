@@ -13,7 +13,7 @@ from sqlmodel import Session, select
 from app.mcp.db import mcp_engine
 from app.mcp.permissions import contexto_mcp, exigir_lectura
 from app.mcp.server import mcp
-from app.models import Household
+from app.models import Household, HouseholdPreference
 from app.services.pantry import obtener_status
 
 
@@ -29,8 +29,8 @@ def get_household_context_resource(household_id: int) -> dict:
             return {"error": "No existe el hogar"}
 
         preferencia = session.exec(
-            select(app.models.HouseholdPreference)
-            .where(app.models.HouseholdPreference.household_id == household_id)
+            select(HouseholdPreference)
+            .where(HouseholdPreference.household_id == household_id)
         ).first()
 
         return {

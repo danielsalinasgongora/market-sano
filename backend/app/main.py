@@ -6,7 +6,19 @@ Producción: `uvicorn app.main:app`. Tests: `create_app(settings)`.
 
 from fastapi import Depends, FastAPI
 
-from app.api import auth, deps, health, households, lists, pantry, plans, prices, products, recipes, tokens
+from app.api import (
+    auth,
+    deps,
+    health,
+    households,
+    lists,
+    pantry,
+    plans,
+    prices,
+    products,
+    recipes,
+    tokens,
+)
 from app.db import get_engine
 from app.settings import Settings, get_settings
 

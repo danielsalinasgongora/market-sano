@@ -16,7 +16,9 @@ from app.models import (
     MealPlan,
     MealPlanEntry,
     PantryItem,
+    PriceSnapshot,
     ProductCatalog,
+    RecipeIngredient,
     ShoppingList,
     ShoppingListItem,
 )
@@ -40,13 +42,6 @@ def generar_lista(
         if plan is None or plan.household_id != household_id:
             raise ShoppingError("No existe el plan para tu hogar.")
 
-    items = session.exec(
-        select(ShoppingListItem)
-        .where(ShoppingListItem.list_id == ShoppingList.id)
-        .where(ShoppingList.household_id == household_id)
-        .where(ShoppingList.status == ListStatus.active)
-    ).all()
-
     lista = ShoppingList(
         household_id=household_id,
         plan_id=plan_id,
@@ -65,8 +60,8 @@ def generar_lista(
 
         for entrada in entradas:
             recipe_ingredients = session.exec(
-                select(app.models.RecipeIngredient)
-                .where(app.models.RecipeIngredient.recipe_id == entrada.recipe_id)
+                select(RecipeIngredient)
+                .where(RecipeIngredient.recipe_id == entrada.recipe_id)
             ).all()
 
             for ing in recipe_ingredients:
@@ -182,10 +177,10 @@ def comparar_basket_across_stores(
             por_cadena[store_id] = {"total_clp": 0, "items": []}
 
         precio_recente = session.exec(
-            select(app.models.PriceSnapshot)
-            .where(app.models.PriceSnapshot.product_id == item.product_id)
-            .where(app.models.PriceSnapshot.store_id == store_id)
-            .order_by(app.models.PriceSnapshot.fetched_at.desc())
+            select(PriceSnapshot)
+            .where(PriceSnapshot.product_id == item.product_id)
+            .where(PriceSnapshot.store_id == store_id)
+            .order_by(PriceSnapshot.fetched_at.desc())
         ).first()
 
         # Usar PPUM cuando no hay precio por unidad
@@ -227,7 +222,7 @@ def comparar_basket_across_stores(
         savings_pct = savings / most_expensive if most_expensive else 0
 
         if savings_pct >= threshold_pct:
-            for item_key, data in por_producto.items():
+            for _item_key, data in por_producto.items():
                 prices = list(data["prices_by_store"].values())
                 if len(prices) > 1:
                     price_diff = max(prices) - min(prices)

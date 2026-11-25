@@ -62,12 +62,12 @@ def listar_listas(
     ).all()
     return [
         {
-            "list_id": l.id,
-            "name": l.name,
-            "status": l.status.value,
-            "created_at": l.created_at.isoformat(),
+            "list_id": item.id,
+            "name": item.name,
+            "status": item.status.value,
+            "created_at": item.created_at.isoformat(),
         }
-        for l in listas
+        for item in listas
     ]
 
 

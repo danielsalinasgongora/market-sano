@@ -21,6 +21,7 @@ from app.mcp.permissions import (
 )
 from app.mcp.server import mcp
 from app.services.planner import (
+    VARIETY_WEEKS,
     PlanInvalido,
     PlanNoEncontrado,
     confirmar_plan,
@@ -34,9 +35,9 @@ from app.services.planner import (
     normalizar_semana,
     obtener_plan,
     sugerir_plan,
-    VARIETY_WEEKS,
 )
 from app.services.recipes import NoEncontrada
+from app.settings import get_settings
 
 
 def _accionable(fn: Any) -> Any:

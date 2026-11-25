@@ -6,9 +6,9 @@ from datetime import date, timedelta
 import pytest
 from sqlmodel import Session, select
 
-from app.models import ExpenseCategory, Household, PantryItem, ProductCatalog, Recipe
-from app.services.expenses import registrar_gasto, get_budget_variance, get_spending_summary
-from app.services.pantry import ajustar_cantidad, obtener_status, get_pantry_shortfall
+from app.models import Household, PantryItem, ProductCatalog, Recipe
+from app.services.expenses import get_budget_variance, get_spending_summary, registrar_gasto
+from app.services.pantry import ajustar_cantidad, get_pantry_shortfall, obtener_status
 
 
 def test_pantry_ajustar_cantidad(engine_sembrado) -> None:

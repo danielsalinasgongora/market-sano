@@ -30,7 +30,7 @@ for r in d:
 
 for s, v in lat.items():
     print(
-        f"{s}: n={len(v)} mediana={statistics.median(v):.0f} ms p95~{sorted(v)[int(len(v) * 0.95) - 1]} ms max={max(v)} ms"  # noqa: E501
+        f"{s}: n={len(v)} mediana={statistics.median(v):.0f} ms p95~{sorted(v)[int(len(v) * 0.95) - 1]} ms max={max(v)} ms"
     )
 print()
 for s, c, n, k, b in rows:

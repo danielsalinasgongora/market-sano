@@ -38,9 +38,9 @@ from app.services.planner import (
     definir_entrada,
     estado_presupuesto,
     estimar_costo_plan,
+    intercambiar_comida,
     obtener_plan,
     sugerir_plan,
-    intercambiar_comida,
 )
 from app.services.prices import registrar_precio_manual
 from app.services.recipes import costo_receta

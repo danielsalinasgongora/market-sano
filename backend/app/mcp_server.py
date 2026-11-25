@@ -31,25 +31,21 @@ def main() -> None:
     if transport == "http":
         # HTTP transport with Bearer token auth
         import uvicorn
-        from fastmcp import FastMCP
         from starlette.applications import Starlette
-        from starlette.routing import Mount, Route
         from starlette.responses import JSONResponse
-        from starlette.middleware import Middleware
-        from starlette.middleware.base import BaseHTTPMiddleware
 
         # Crear app Starlette que exponga el MCP como HTTP API
         app = Starlette()
 
         @app.route("/tools/{tool_name:path}")
         async def call_tool(request, tool_name: str):
-            token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            _ = request.headers.get("Authorization", "").replace("Bearer ", "")
             # Validar token (requiere scope apropiado)
             return JSONResponse({"tool": tool_name, "status": "implementation needed"})
 
         @app.route("/resources/{resource_path:path}")
         async def read_resource(request, resource_path: str):
-            token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            _ = request.headers.get("Authorization", "").replace("Bearer ", "")
             return JSONResponse({"resource": resource_path, "status": "implementation needed"})
 
         uvicorn.run(app, host="0.0.0.0", port=8001)

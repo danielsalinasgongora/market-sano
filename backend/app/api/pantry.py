@@ -7,28 +7,26 @@ Endpoints REST para gestión de inventario y registro de gastos.
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session
 
 from app.api.deps import contexto, requiere_escritura
 from app.db import get_session
+from app.models.enums import MovementReason
+from app.services.expenses import (
+    get_budget_variance,
+    get_spending_summary,
+    obtener_gastos,
+    registrar_gasto,
+)
 from app.services.households import ContextoHogar
 from app.services.pantry import (
-    PantryError,
     ajustar_cantidad,
     get_pantry_shortfall,
     obtener_despensa,
     obtener_status,
 )
-from app.services.expenses import (
-    ExpenseError,
-    get_budget_variance,
-    get_spending_summary,
-    registrar_gasto,
-    obtener_gastos,
-)
-from app.models.enums import MovementReason
 
 router = APIRouter(prefix="/api/v1", tags=["despensa"])
 
