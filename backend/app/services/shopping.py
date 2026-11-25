@@ -230,15 +230,28 @@ def comparar_basket_across_stores(
                         division_suggestions.append({
                             "product_id": data["product_id"],
                             "name": data["name"],
-                            "cheapest_store": min(data["prices_by_store"], key=data["prices_by_store"].get),
-                            "most_expensive_store": max(data["prices_by_store"], key=data["prices_by_store"].get),
+                            "cheapest_store": min(
+                                data["prices_by_store"], key=data["prices_by_store"].get
+                            ),
+                            "most_expensive_store": max(
+                                data["prices_by_store"], key=data["prices_by_store"].get
+                            ),
                             "saving_clp": price_diff,
                         })
 
     return {
         "list_id": list_id,
-        "stores": [{"store_id": s, "total_clp": d["total_clp"]} for s, d in por_cadena.items()],
-        "cheapest_store": min(por_cadena, key=lambda s: por_cadena[s]["total_clp"]) if por_cadena else None,
-        "savings_if_sharing": sum(d["saving_clp"] for d in division_suggestions) if division_suggestions else 0,
+        "stores": [
+            {"store_id": s, "total_clp": d["total_clp"]}
+            for s, d in por_cadena.items()
+        ],
+        "cheapest_store": (
+            min(por_cadena, key=lambda s: por_cadena[s]["total_clp"])
+            if por_cadena else None
+        ),
+        "savings_if_sharing": (
+            sum(d["saving_clp"] for d in division_suggestions)
+            if division_suggestions else 0
+        ),
         "division_suggestions": division_suggestions[:10],  # Top 10
     }

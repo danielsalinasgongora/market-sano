@@ -163,7 +163,9 @@ def get_spending_summary_tool(
             except ValueError as exc:
                 raise ToolError(f"end_date inválida: {end_date!r}. Usa YYYY-MM-DD.") from exc
 
-        return _accionable(lambda: get_spending_summary(session, ctx.hogar.id, start, end, group_by))
+        return _accionable(
+            lambda: get_spending_summary(session, ctx.hogar.id, start, end, group_by)
+        )
 
 
 @mcp.tool
@@ -223,4 +225,8 @@ def compare_basket_across_stores_tool(
     with Session(mcp_engine()) as session:
         ctx = contexto_mcp(session)
         exigir_lectura(ctx)
-        return _accionable(lambda: comparar_basket_across_stores(session, ctx.hogar.id, list_id, threshold_pct))
+        return _accionable(
+            lambda: comparar_basket_across_stores(
+                session, ctx.hogar.id, list_id, threshold_pct
+            )
+        )
